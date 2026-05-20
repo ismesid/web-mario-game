@@ -1,0 +1,8 @@
+{
+  "engine": "cocos-creator-js",
+  "packages": "packages",
+  "name": "web_mario_game",
+  "id": "2c420c98-e88c-4a8f-94e9-fd523720d7eb",
+  "version": "2.4.8",
+  "isNew": false
+}
