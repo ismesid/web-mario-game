@@ -1,80 +1,86 @@
-# AI_reference
+# AI Reference
 
-Web Mario：AI 協作開發紀錄
+Web Mario: AI-assisted development record
 
 ## 1. AI Tool(s) Used
 
-- **ChatGPT**：協助分析作業要求、規劃開發順序、確認 Cocos Creator 2.4.8 寫法、處理 UI 版面問題，以及協助撰寫 `README.md` 與 `AI_reference.md` 草稿。
+- **ChatGPT**: Used to analyze assignment requirements, plan the development order, confirm Cocos Creator 2.4.8 scripting patterns, solve UI layout issues, debug gameplay behavior, and draft `README.md` and `AI_reference.md`.
 
 ## 2. Scope of Usage / Code Location
 
-| 檔案 / 位置 | AI 協助內容 | 目前使用情況 |
+| File / Location | AI Assistance | Current Usage |
 |---|---|---|
-| `assets/scripts/SceneChanger.ts` | 協助撰寫 Cocos Creator 2.4.8 可用的場景切換 script。 | 用於 `START` 與 `LEVEL 1` 按鈕。 |
-| `assets/scenes/StartScene.fire` | 協助規劃開始畫面的 UI 結構與按鈕設定。 | 用於遊戲開始畫面。 |
-| `assets/scenes/LevelSelectScene.fire` | 協助規劃關卡選擇畫面的 UI 結構與按鈕設定。 | 用於關卡選擇畫面。 |
-| `README.md` | 協助整理目前功能、玩法與評分項目狀態。 | 由我再修改成使用者導向的 README。 |
-| `AI_reference.md` | 協助整理 AI 使用紀錄。 | 之後會轉成 `AI_reference.pdf`。 |
+| `assets/scripts/SceneChanger.ts` | Helped write a Cocos Creator 2.4.8-compatible scene switching script. | Used by the `START` and `LEVEL 1` buttons. |
+| `assets/scripts/PlayerController.ts` | Helped implement Mario movement, jump, sprite direction, walking animation, and intro lock behavior. | Used by the Player node in `MainGameScene`. |
+| `assets/scripts/GroundGenerator.ts` | Helped generate the first-level ground from tile assets and create a static ground collider. | Used by the Map / Ground node in `MainGameScene`. |
+| `assets/scripts/LevelIntro.ts` | Helped implement the reusable level intro overlay and fade-out flow. | Used by the Canvas in `MainGameScene`. |
+| `assets/scripts/AnimatedTileBackground.ts` | Helped build an animated tiled water background from `tiles_570` to `tiles_573`. | Used by `LevelIntroUI > WaterBackground`. |
+| `assets/scripts/IntroTextGroupSwitcher.ts` | Helped switch between manually arranged intro text groups. | Used by `LevelIntroUI`. |
+| `assets/scenes/StartScene.fire` | Helped plan the start screen UI structure and button setup. | Used as the game start screen. |
+| `assets/scenes/LevelSelectScene.fire` | Helped plan the level select UI structure and button setup. | Used as the level selection screen. |
+| `assets/scenes/MainGameScene.fire` | Helped debug the main scene hierarchy and runtime setup. | Used as the first gameplay scene. |
+| `README.md` | Helped organize current features, gameplay instructions, grading status, and setup notes. | Used as the project README. |
+| `AI_reference.md` | Helped organize the AI usage record. | Will be exported as `AI_reference.pdf`. |
 
 ## 3. Prompt / Response Evidence
 
-### 紀錄 1：分析作業要求與開發順序
+### Record 1: Assignment analysis and development order
 
-**Prompt**
+**Prompt (translated)**
 
-> 先分析老師的評分標準 和我給你的資源檔 然後從教我建立一個COCOS檔 然後怎麼git上去 然後一個一個功能實做出來 我完成一步會跟你說 再跟我說下一步怎麼做
+> First analyze the teacher's grading criteria and the resource files I gave you. Then teach me how to create a Cocos project, how to push it to Git, and how to implement the features one by one. After I finish each step, I will tell you, and then you can tell me the next step.
 
 **AI Response Summary**
 
-ChatGPT 協助整理老師的評分項目，並建議用逐步開發的方式完成專案：先建立 Cocos 專案、匯入素材、建立場景與選單流程，再依序實作玩家、地圖、敵人、問號方塊、UI、音效、Git 與 Firebase 部署。
+ChatGPT helped organize the grading requirements and suggested a step-by-step development plan: create the Cocos project, import assets, create scenes and menu flow, then implement the player, map, enemies, question blocks, UI, sound effects, Git workflow, and Firebase deployment.
 
 **Refinement & Explanation**
 
-我目前只先完成第一階段，也就是建立可測試的基本流程：`StartScene → LevelSelectScene → MainGameScene`。這樣可以避免一次實作太多功能，也比較容易在每個階段確認專案沒有壞掉。
+Only the first phase was implemented at the beginning: a testable basic flow from `StartScene` to `LevelSelectScene` to `MainGameScene`. This reduced risk by allowing each stage to be verified before adding more gameplay systems.
 
 ---
 
-### 紀錄 2：素材匯入與素材使用範圍
+### Record 2: Asset import and asset usage scope
 
-**Prompt**
+**Prompt (translated)**
 
-> others 裡面的那兩張圖要放進來嗎 看起來像不同種類的馬力歐
+> Should I import the two images inside the `others` folder? They look like different types of Mario.
 
 **AI Response Summary**
 
-ChatGPT 建議可以先把 `others` 資料夾一起匯入，但第一版先不要使用，因為那些圖片可能代表其他型態的 Mario，若要做火焰或狸貓能力會增加遊戲邏輯複雜度。
+ChatGPT suggested importing the `others` folder but not using those assets in the first version. Those images may represent other Mario forms, and adding them too early would increase gameplay complexity.
 
 **Refinement & Explanation**
 
-我有將 `others` 資料夾匯入專案，但目前版本只使用 menu、title、button、font 等素材。其他型態的 Mario 會留到基本功能完成後再評估是否加入。
+The `others` folder was imported into the project, but the current version only uses menu, title, button, font, player, and tile assets. Other Mario forms may be considered after the basic game is complete.
 
 ---
 
-### 紀錄 3：開始畫面與關卡選擇畫面
+### Record 3: Start screen and level select screen
 
-**Prompt**
+**Prompt (translated)**
 
-> 好了 教我下一步
+> Done. Teach me the next step.
 
 **AI Response Summary**
 
-ChatGPT 引導建立 `StartScene`、`LevelSelectScene` 與 `MainGameScene`，並說明如何放入背景、標題圖片、button sprite，以及設定按鈕的 hover / pressed 狀態。
+ChatGPT guided the creation of `StartScene`, `LevelSelectScene`, and `MainGameScene`, including how to place backgrounds, title images, button sprites, and button hover / pressed states.
 
 **Refinement & Explanation**
 
-我在 Cocos Creator 中手動調整位置、大小與顯示效果，並使用 TA 提供的 UI 素材取代 Cocos 預設 button，讓畫面風格更接近 Mario 遊戲。
+The UI layout, size, and display style were manually adjusted in Cocos Creator. TA-provided UI assets were used instead of default Cocos buttons so that the menu style better matched a Mario-style game.
 
 ---
 
-### 紀錄 4：修正 Cocos Creator 版本造成的 script 問題
+### Record 4: Fixing Cocos Creator version-specific script issues
 
-**Prompt**
+**Prompt (translated)**
 
-> 我找不到scenechanger可以掛在哪 而且coco抱錯
+> I cannot find where to attach `SceneChanger`, and Cocos is reporting errors.
 
 **AI Response Summary**
 
-一開始 AI 提供的 script 是 Cocos Creator 3.x 寫法。後來 ChatGPT 根據錯誤訊息與畫面判斷我使用的是 Cocos Creator 2.4.8，因此改成 `cc._decorator`、`cc.Component` 與 `cc.director.loadScene()` 的寫法。
+The first script version used Cocos Creator 3.x syntax. After checking the error and the project version, ChatGPT corrected the script to use Cocos Creator 2.4.8 syntax: `cc._decorator`, `cc.Component`, and `cc.director.loadScene()`.
 
 **Final Code Used**
 
@@ -99,32 +105,126 @@ export default class SceneChanger extends cc.Component {
 
 **Refinement & Explanation**
 
-我將原本不相容的 Cocos 3.x import 寫法改成 Cocos Creator 2.4.8 可用的寫法。這個 script 會掛在 button node 上，再由 Button 的 Click Events 指定要呼叫的 function。
+The incompatible Cocos 3.x import syntax was replaced with Cocos Creator 2.4.8-compatible syntax. The script is attached to a button node and called through the Button component's Click Events.
 
 ---
 
-### 紀錄 5：調整 pixel art 與 bitmap font 顯示
+### Record 5: Pixel art and bitmap font display
 
-**Prompt**
+**Prompt (translated)**
 
-> 圖片都變清楚了 但字體還是糊的
+> The images are clear now, but the font is still blurry.
 
 **AI Response Summary**
 
-ChatGPT 說明 pixel art 與 bitmap font 的貼圖需要將 Filter 設成 `Point`，而且 Label 盡量不要用非整數 scale，否則會讓字體看起來模糊。
+ChatGPT explained that pixel-art images and bitmap font textures should use the `Point` filter. It also recommended avoiding non-integer label scaling because that can make bitmap fonts look blurry.
 
 **Refinement & Explanation**
 
-我調整了背景、按鈕、標題與 bitmap font 相關貼圖的 Filter 設定，讓目前選單畫面的圖片與字體顯示更清楚。
+Texture filter settings for backgrounds, buttons, titles, and bitmap fonts were adjusted so that the menu screens display more clearly.
 
-## 4. 目前 AI 使用總結
+---
 
-目前 AI 主要用於：
+### Record 6: MainGameScene visibility and player control
 
-- 理解老師的評分標準。
-- 規劃 Cocos 專案開發順序。
-- 建立開始畫面、關卡選擇畫面與場景切換流程。
-- 修正 Cocos Creator 2.4.8 與 3.x 語法不同造成的 script 問題。
-- 協助撰寫目前版本的文件草稿。
+**Prompt (translated)**
 
-目前尚未實作 Mario 移動、碰撞、敵人、question block、UI、音效與 Firebase 部署。之後若這些功能有使用 AI 協助，會再把新的紀錄補到此文件中。
+> Nothing is visible. There is only one fixed Mario. When I press A/D, he raises his hand, but he still does not move, and the screen is black.
+
+**AI Response Summary**
+
+ChatGPT inspected the Cocos Creator project structure and helped debug the `MainGameScene` setup. The work focused on making the scene visible, enabling player physics, using side-facing Mario frames, adding keyboard movement, adding jump input, and building sprite animation from `mario_small.plist`.
+
+**Final Code / Files Used**
+
+| File | AI-assisted Change |
+|---|---|
+| `assets/scripts/PlayerController.ts` | Added Mario keyboard movement, jump, walking animation, side-facing idle frame, and intro lock behavior. |
+| `assets/resources/player/mario_small.plist` | Used as the sprite atlas reference for Mario animation frames. |
+
+**Refinement & Explanation**
+
+Mario's visual scale should be controlled in COCO instead of being hardcoded in script. This makes it easier to compare Mario's size with manually placed map objects.
+
+---
+
+### Record 7: Ground generation
+
+**Prompt (translated)**
+
+> `tiles_272` is the middle ground tile, `tiles_271` is the left edge ground tile, and `tiles_273` is the right edge ground tile. Generate the ground at three times the original image size and use the x/y coordinate of the `tiles_272` tile I placed in COCO as the starting point.
+
+**AI Response Summary**
+
+ChatGPT created a reusable ground generator that reads the manually placed `tiles_272` node as the first ground tile position. It then generates a longer platform using the left, middle, and right tile frames from the `tiles/tiles` atlas.
+
+**Final Code / Files Used**
+
+| File | AI-assisted Change |
+|---|---|
+| `assets/scripts/GroundGenerator.ts` | Generates first-level ground from `tiles_271.png`, `tiles_272.png`, and `tiles_273.png` at 3x scale. |
+| `assets/resources/tiles/tiles.plist` | Used as the tile atlas source. |
+
+**Refinement & Explanation**
+
+The generator is intended to be attached to `Map` or `Ground`, not to the sample `tiles_272` node. The sample tile remains useful as an editor-side position marker and is hidden by the script at runtime.
+
+---
+
+### Record 8: Level intro and loading UI
+
+**Prompt (translated)**
+
+> Mario falls before the ground is generated. Can we add an entering-level screen? I want the level intro background to use `tiles_570` to `tiles_573` as an animation that looks like water flowing down.
+
+**AI Response Summary**
+
+ChatGPT separated the level intro logic from the ground generator so that the same intro behavior can be reused by other levels. The solution stays inside `MainGameScene` and does not require an additional scene. `LevelIntroUI` is used as an overlay while the map and physics setup finish.
+
+**Final Code / Files Used**
+
+| File | AI-assisted Change |
+|---|---|
+| `assets/scripts/LevelIntro.ts` | Controls intro root display, minimum display time, level-ready waiting, and fade-out. |
+| `assets/scripts/AnimatedTileBackground.ts` | Builds a full-screen animated water background using `tiles_570.png` to `tiles_573.png`. |
+| `assets/scripts/IntroTextGroupSwitcher.ts` | Switches from an initial text group such as `LEVEL 1` to a ready text group such as `GET` / `READY`. |
+
+**Refinement & Explanation**
+
+The first frame can show a simple `LEVEL 1` text to avoid an empty black frame. After the water animation frames are ready, the intro text switches to a separate ready group. This also avoids relying on unsupported bitmap-font characters such as hyphens or visually unclear spaces.
+
+## 4. Current AI Usage Summary
+
+AI was mainly used for:
+
+- Understanding the teacher's grading criteria.
+- Planning the Cocos project development order.
+- Creating the start screen, level select screen, and scene switching flow.
+- Fixing Cocos Creator 2.4.8 and 3.x syntax differences.
+- Improving pixel-art and bitmap font display.
+- Debugging the main gameplay scene.
+- Implementing Mario movement and animation.
+- Generating the first-level ground.
+- Building the reusable level intro and animated water loading background.
+- Drafting and updating project documentation.
+
+## 5. Current COCO Setup Notes
+
+| Node | Component / Setup |
+|---|---|
+| `Canvas` | Attach `LevelIntro`; assign `Intro Root` to `LevelIntroUI`. |
+| `Canvas > LevelIntroUI > WaterBackground` | Attach `AnimatedTileBackground`; set atlas to `tiles/tiles`; set frames to `tiles_570.png,tiles_571.png,tiles_572.png,tiles_573.png`. |
+| `Canvas > LevelIntroUI` | Attach `IntroTextGroupSwitcher`; assign `InitialTextGroup` and `ReadyTextGroup`. |
+| `Canvas > World > Map` or `Ground` | Attach `GroundGenerator`; keep a manually placed `tiles_272` as the starting position marker. |
+| `Canvas > World > Player` | Attach `PlayerController`; adjust visual scale in COCO if needed. |
+
+## 6. Remaining Work
+
+| Item | Status |
+|---|:---:|
+| Camera follow | Not yet |
+| Question block behavior and animation | Not yet |
+| Enemy behavior | Not yet |
+| Score, timer, life UI | Not yet |
+| Sound effects and BGM | Not yet |
+| Firebase deployment | Not yet |

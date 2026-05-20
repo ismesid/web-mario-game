@@ -51,3 +51,9 @@ Thumbs.db
 #//////////////////////////
 
 .vscode/
+
+# Presentation files
+*.ppt
+*.pptx
+*.key
+*.odp
