@@ -30,42 +30,52 @@ export default class CameraFollow extends cc.Component {
     verticalOffset: number = 0;
 
     @property
+    yDeadZone: number = 80;
+
+    @property
     smoothTime: number = 0.08;
+
+    @property
+    ySmoothTime: number = 0.14;
 
     private targetNode: cc.Node = null;
     private mapNode: cc.Node = null;
     private initialPosition: cc.Vec2 = null;
     private camera: cc.Camera = null;
+    private yHomePosition = 0;
 
     onLoad() {
         this.targetNode = cc.find(this.targetNodePath);
         this.mapNode = cc.find(this.mapNodePath);
         this.initialPosition = cc.v2(this.node.x, this.node.y);
+        this.yHomePosition = this.initialPosition.y;
         this.camera = this.getComponent(cc.Camera);
         this.applyCameraZoom();
     }
 
     start() {
-        const nextPosition = this.getNextCameraPosition();
+        const nextPosition = this.getNextCameraPosition(false);
         if (nextPosition) {
             this.node.setPosition(nextPosition);
+            this.yHomePosition = nextPosition.y;
         }
     }
 
     lateUpdate(dt: number) {
         this.applyCameraZoom();
 
-        const nextPosition = this.getNextCameraPosition();
+        const nextPosition = this.getNextCameraPosition(true);
         if (!nextPosition) {
             return;
         }
 
-        const t = this.smoothTime <= 0 ? 1 : Math.min(1, dt / this.smoothTime);
-        this.node.x = this.node.x + (nextPosition.x - this.node.x) * t;
-        this.node.y = this.node.y + (nextPosition.y - this.node.y) * t;
+        const xT = this.smoothTime <= 0 ? 1 : Math.min(1, dt / this.smoothTime);
+        const yT = this.ySmoothTime <= 0 ? 1 : Math.min(1, dt / this.ySmoothTime);
+        this.node.x = this.node.x + (nextPosition.x - this.node.x) * xT;
+        this.node.y = this.node.y + (nextPosition.y - this.node.y) * yT;
     }
 
-    private getNextCameraPosition() {
+    private getNextCameraPosition(useDeadZone: boolean) {
         if (!this.targetNode || !cc.isValid(this.targetNode)) {
             this.targetNode = cc.find(this.targetNodePath);
         }
@@ -79,7 +89,7 @@ export default class CameraFollow extends cc.Component {
         const targetWorld = this.targetNode.convertToWorldSpaceAR(cc.v2(0, 0));
         const targetLocal = this.node.parent.convertToNodeSpaceAR(targetWorld);
         let nextX = this.followX ? targetLocal.x : this.initialPosition.x;
-        let nextY = this.followY ? targetLocal.y + this.verticalOffset : this.initialPosition.y;
+        let nextY = this.followY ? this.getDeadZoneY(targetLocal.y + this.verticalOffset, useDeadZone) : this.initialPosition.y;
 
         if (this.mapNode) {
             const bounds = this.getMapBoundsInCameraParent();
@@ -96,6 +106,21 @@ export default class CameraFollow extends cc.Component {
         }
 
         return cc.v2(nextX, nextY);
+    }
+
+    private getDeadZoneY(targetY: number, useDeadZone: boolean) {
+        if (!useDeadZone || this.yDeadZone <= 0) {
+            return targetY;
+        }
+
+        if (targetY > this.yHomePosition + this.yDeadZone) {
+            return targetY - this.yDeadZone;
+        }
+        if (targetY < this.yHomePosition - this.yDeadZone) {
+            return targetY + this.yDeadZone;
+        }
+
+        return this.yHomePosition;
     }
 
     private applyCameraZoom() {

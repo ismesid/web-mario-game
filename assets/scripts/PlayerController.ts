@@ -6,13 +6,22 @@ export default class PlayerController extends cc.Component {
     moveSpeed: number = 180;
 
     @property
-    jumpSpeed: number = 520;
+    jumpSpeed: number = 450;
+
+    @property
+    longJumpHorizontalSpeed: number = 280;
+
+    @property
+    runUpTimeForLongJump: number = 0.35;
 
     @property
     climbSpeed: number = 120;
 
     @property
     mapNodePath: string = 'Canvas/World/Map/mario map';
+
+    @property
+    boundsMapNodePath: string = 'Canvas/World/Map/mario map';
 
     @property
     startObjectGroupName: string = 'start point';
@@ -39,6 +48,15 @@ export default class PlayerController extends cc.Component {
     climbThroughPlatformBottoms: boolean = true;
 
     @property
+    enforceMapBounds: boolean = true;
+
+    @property
+    vineTopSensorExtraHeight: number = 16;
+
+    @property
+    vineTopJumpTolerance: number = 8;
+
+    @property
     colliderWidth: number = 18;
 
     @property
@@ -53,6 +71,7 @@ export default class PlayerController extends cc.Component {
     private jumpQueued = false;
     private jumpAnimationTimer = 0;
     private jumpStartedWithForwardSpeed = false;
+    private groundRunTime = 0;
     private groundColliders: cc.Collider[] = [];
     private vineColliders: cc.Collider[] = [];
     private climbPassThroughColliders: cc.Collider[] = [];
@@ -66,6 +85,7 @@ export default class PlayerController extends cc.Component {
     private spawnPosition: cc.Vec2 = null;
     private defaultGravityScale = 1;
     private readonly groundCheckTolerance = 8;
+    private readonly groundContactNormalY = -0.35;
     private readonly climbThroughNormalY = 0.35;
     private readonly climbExitClearance = 2;
 
@@ -131,29 +151,38 @@ export default class PlayerController extends cc.Component {
             this.jumpAnimationTimer = Math.max(0, this.jumpAnimationTimer - cc.director.getDeltaTime());
         }
 
-        if (this.canClimb() && (this.movingUp || this.movingDown)) {
+        if (this.shouldForwardJumpFromUpInput() || this.shouldJumpFromVineTop()) {
+            this.queueJump();
+        } else if (this.canClimb() && (this.movingUp || this.movingDown)) {
             this.startClimbing();
         }
 
         if (this.isClimbing) {
             this.updateClimbing();
+            this.enforceMapBoundary();
             return;
         }
 
         this.updateNormalMovement();
+        this.enforceMapBoundary();
     }
 
     private updateNormalMovement() {
         const velocity = this.body.linearVelocity;
-        const velocityX = this.getInputVelocityX(this.moveSpeed);
+        let velocityX = this.getNormalVelocityX(velocity.x);
         let velocityY = velocity.y;
+        const grounded = this.isGrounded();
 
         this.applyFacing(velocityX);
 
-        if (this.jumpQueued && this.isGrounded()) {
+        if (this.jumpQueued && grounded) {
             velocityY = this.jumpSpeed;
+            velocityX = this.getJumpVelocityX(velocityX);
             this.jumpAnimationTimer = this.jumpAnimationLockTime;
             this.jumpStartedWithForwardSpeed = Math.abs(velocityX) > 20 || this.movingLeft || this.movingRight;
+            this.groundRunTime = 0;
+        } else {
+            this.updateRunUpTimer(velocityX, grounded);
         }
         this.jumpQueued = false;
 
@@ -204,6 +233,56 @@ export default class PlayerController extends cc.Component {
         }
 
         return velocityX;
+    }
+
+    private getNormalVelocityX(currentVelocityX: number) {
+        const inputVelocityX = this.getInputVelocityX(this.moveSpeed);
+        if (this.isGrounded() || inputVelocityX === 0 || Math.abs(currentVelocityX) <= this.moveSpeed) {
+            return inputVelocityX;
+        }
+
+        if ((currentVelocityX > 0 && inputVelocityX > 0) || (currentVelocityX < 0 && inputVelocityX < 0)) {
+            return currentVelocityX;
+        }
+
+        return inputVelocityX;
+    }
+
+    private updateRunUpTimer(velocityX: number, grounded: boolean) {
+        if (grounded && Math.abs(velocityX) > 1 && this.hasHorizontalInput()) {
+            this.groundRunTime += cc.director.getDeltaTime();
+            return;
+        }
+
+        this.groundRunTime = 0;
+    }
+
+    private getJumpVelocityX(velocityX: number) {
+        if (!this.hasHorizontalInput()) {
+            return velocityX;
+        }
+
+        let direction = 0;
+        if (this.movingRight && !this.movingLeft) {
+            direction = 1;
+        } else if (this.movingLeft && !this.movingRight) {
+            direction = -1;
+        } else if (velocityX > 0) {
+            direction = 1;
+        } else if (velocityX < 0) {
+            direction = -1;
+        }
+
+        if (direction === 0) {
+            return velocityX;
+        }
+
+        const runUpRatio = this.runUpTimeForLongJump <= 0
+            ? 1
+            : Math.min(1, this.groundRunTime / this.runUpTimeForLongJump);
+        const jumpSpeedX = this.moveSpeed + (this.longJumpHorizontalSpeed - this.moveSpeed) * runUpRatio;
+
+        return direction * jumpSpeedX;
     }
 
     private applyFacing(velocityX: number) {
@@ -358,6 +437,85 @@ export default class PlayerController extends cc.Component {
         return this.node.parent.convertToNodeSpaceAR(worldPosition);
     }
 
+    private enforceMapBoundary() {
+        if (!this.enforceMapBounds || !this.body) {
+            return;
+        }
+
+        const selfCollider = this.getComponent(cc.PhysicsBoxCollider);
+        const bounds = this.getMapWorldBounds();
+        if (!selfCollider || !bounds) {
+            return;
+        }
+
+        const selfRect = this.getWorldRect(selfCollider);
+        let offsetX = 0;
+        let offsetY = 0;
+
+        if (selfRect.left < bounds.left) {
+            offsetX = bounds.left - selfRect.left;
+        } else if (selfRect.right > bounds.right) {
+            offsetX = bounds.right - selfRect.right;
+        }
+
+        if (selfRect.top > bounds.top) {
+            offsetY = bounds.top - selfRect.top;
+        }
+
+        if (offsetX === 0 && offsetY === 0) {
+            return;
+        }
+
+        const currentWorld = this.node.convertToWorldSpaceAR(cc.v2(0, 0));
+        const clampedWorld = cc.v2(currentWorld.x + offsetX, currentWorld.y + offsetY);
+        const nextLocal = this.node.parent
+            ? this.node.parent.convertToNodeSpaceAR(clampedWorld)
+            : clampedWorld;
+        const velocity = this.body.linearVelocity;
+
+        this.node.setPosition(nextLocal);
+        let nextVelocityX = velocity.x;
+        let nextVelocityY = velocity.y;
+        if ((offsetX < 0 && velocity.x > 0) || (offsetX > 0 && velocity.x < 0)) {
+            nextVelocityX = 0;
+        }
+        if (offsetY < 0 && velocity.y > 0) {
+            nextVelocityY = 0;
+        }
+        this.body.linearVelocity = cc.v2(nextVelocityX, nextVelocityY);
+        this.body.syncPosition(true);
+    }
+
+    private getMapWorldBounds() {
+        const mapNode = cc.find(this.boundsMapNodePath);
+        if (!mapNode) {
+            return null;
+        }
+
+        const tileMap = mapNode.getComponent(cc.TiledMap);
+        if (!tileMap) {
+            return null;
+        }
+
+        const mapSize = tileMap.getMapSize();
+        const tileSize = tileMap.getTileSize();
+        const mapWidth = mapSize.width * tileSize.width;
+        const mapHeight = mapSize.height * tileSize.height;
+        const left = -mapWidth * mapNode.anchorX;
+        const right = mapWidth * (1 - mapNode.anchorX);
+        const top = mapHeight * (1 - mapNode.anchorY);
+        const bottom = -mapHeight * mapNode.anchorY;
+        const bottomLeft = mapNode.convertToWorldSpaceAR(cc.v2(left, bottom));
+        const topRight = mapNode.convertToWorldSpaceAR(cc.v2(right, top));
+
+        return {
+            left: Math.min(bottomLeft.x, topRight.x),
+            right: Math.max(bottomLeft.x, topRight.x),
+            bottom: Math.min(bottomLeft.y, topRight.y),
+            top: Math.max(bottomLeft.y, topRight.y)
+        };
+    }
+
     private loadMarioFrames() {
         cc.loader.loadRes(this.marioAtlasPath, cc.SpriteAtlas, (err: Error, atlas: cc.SpriteAtlas) => {
             if (err || !atlas || !cc.isValid(this.node)) {
@@ -432,15 +590,16 @@ export default class PlayerController extends cc.Component {
             return;
         }
 
-        if (this.isStandingOn(otherCollider)) {
-            this.addUniqueCollider(this.groundColliders, otherCollider);
-        }
+        this.refreshGroundContact(contact, selfCollider, otherCollider);
     }
 
     onPreSolve(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
         if (this.shouldPassThroughWhileClimbing(contact, selfCollider, otherCollider)) {
             contact.disabledOnce = true;
+            return;
         }
+
+        this.refreshGroundContact(contact, selfCollider, otherCollider);
     }
 
     onEndContact(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
@@ -470,7 +629,7 @@ export default class PlayerController extends cc.Component {
             case cc.macro.KEY.up:
                 if (!this.movingUp) {
                     this.movingUp = true;
-                    if (!this.canClimb()) {
+                    if (!this.canClimb() || (this.hasHorizontalInput() && this.isGrounded())) {
                         this.queueJump();
                     }
                 }
@@ -527,6 +686,38 @@ export default class PlayerController extends cc.Component {
         return this.groundColliders.length > 0;
     }
 
+    private shouldJumpFromVineTop() {
+        return !this.isClimbing && this.movingUp && this.canClimb() && this.isGrounded() && this.isStandingAtVineTop();
+    }
+
+    private shouldForwardJumpFromUpInput() {
+        return this.movingUp && this.hasHorizontalInput() && (this.isGrounded() || this.isClimbing);
+    }
+
+    private hasHorizontalInput() {
+        return this.movingLeft || this.movingRight;
+    }
+
+    private isStandingAtVineTop() {
+        const selfCollider = this.getComponent(cc.PhysicsBoxCollider);
+        if (!selfCollider) {
+            return false;
+        }
+
+        const selfRect = this.getWorldRect(selfCollider);
+        for (let i = 0; i < this.vineColliders.length; i++) {
+            const vineRect = this.getWorldRect(this.vineColliders[i]);
+            const effectiveVineTop = vineRect.top - this.vineTopSensorExtraHeight;
+            const overlapsX = selfRect.left < vineRect.right && selfRect.right > vineRect.left;
+
+            if (overlapsX && selfRect.bottom >= effectiveVineTop - this.vineTopJumpTolerance) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private isVineCollider(otherCollider: cc.Collider) {
         return otherCollider && otherCollider.tag === this.vineColliderTag;
     }
@@ -561,6 +752,39 @@ export default class PlayerController extends cc.Component {
             && selfRect.bottom <= otherRect.top + this.groundCheckTolerance;
 
         return overlapsX && bottomNearTop;
+    }
+
+    private refreshGroundContact(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
+        if (this.isVineCollider(otherCollider)) {
+            return;
+        }
+
+        if (this.isStandingOn(otherCollider) || this.hasGroundContactNormal(contact, selfCollider, otherCollider)) {
+            this.addUniqueCollider(this.groundColliders, otherCollider);
+        }
+    }
+
+    private hasGroundContactNormal(
+        contact: cc.PhysicsContact,
+        selfCollider: cc.Collider,
+        otherCollider: cc.Collider
+    ) {
+        if (!contact || !selfCollider || !otherCollider || !otherCollider.node || otherCollider.node === this.node) {
+            return false;
+        }
+
+        const selfRect = this.getWorldRect(selfCollider);
+        const otherRect = this.getWorldRect(otherCollider);
+        const overlapsX = selfRect.left < otherRect.right && selfRect.right > otherRect.left;
+        const selfAboveOther = selfRect.centerY >= otherRect.centerY;
+        if (!overlapsX || !selfAboveOther) {
+            return false;
+        }
+
+        const normal = contact.getWorldManifold().normal;
+        const normalFromSelfToOther = contact.colliderA === selfCollider ? normal : cc.v2(-normal.x, -normal.y);
+
+        return normalFromSelfToOther.y < this.groundContactNormalY;
     }
 
     private shouldPassThroughWhileClimbing(
