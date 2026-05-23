@@ -12,13 +12,18 @@ Web Mario: AI-assisted development record
 |---|---|---|
 | `assets/scripts/SceneChanger.ts` | Helped write a Cocos Creator 2.4.8-compatible scene switching script. | Used by the `START` and `LEVEL 1` buttons. |
 | `assets/scripts/PlayerController.ts` | Helped implement Mario movement, jump, sprite direction, walking animation, and intro lock behavior. | Used by the Player node in `MainGameScene`. |
-| `assets/scripts/GroundGenerator.ts` | Helped generate the first-level ground from tile assets and create a static ground collider. | Used by the Map / Ground node in `MainGameScene`. |
-| `assets/scripts/LevelIntro.ts` | Helped implement the reusable level intro overlay and fade-out flow. | Used by the Canvas in `MainGameScene`. |
-| `assets/scripts/AnimatedTileBackground.ts` | Helped build an animated tiled water background from `tiles_570` to `tiles_573`. | Used by `LevelIntroUI > WaterBackground`. |
-| `assets/scripts/IntroTextGroupSwitcher.ts` | Helped switch between manually arranged intro text groups. | Used by `LevelIntroUI`. |
+| `assets/scripts/CameraFollow.ts` | Helped implement horizontal camera follow and map-bound clamping. | Used by `Main Camera` in `MainGameScene`. |
+| `assets/scripts/TileMapCollisionBuilder.ts` | Helped generate physics colliders from TMX tile layers and configure solid, ignored, and vine layers. | Used by the TMX map node in `MainGameScene`. |
+| `assets/scripts/TileCollisionBounds.ts` | Helped generate per-tile collision bounds from the visible alpha pixels of used tiles. | Used by `TileMapCollisionBuilder` to avoid oversized tile colliders. |
+| `assets/scripts/GroundGenerator.ts` | Helped prototype generated ground before the TMX map was added. | Removed after switching to the TMX map workflow. |
+| `assets/scripts/LevelIntro.ts` | Helped prototype the reusable level intro overlay and fade-out flow. | Removed after the level intro UI was taken out of the current gameplay scene. |
+| `assets/scripts/AnimatedTileBackground.ts` | Helped prototype an animated tiled water intro background. | Removed with the old level intro UI. |
+| `assets/scripts/IntroTextGroupSwitcher.ts` | Helped prototype manually arranged intro text groups. | Removed with the old level intro UI. |
 | `assets/scenes/StartScene.fire` | Helped plan the start screen UI structure and button setup. | Used as the game start screen. |
 | `assets/scenes/LevelSelectScene.fire` | Helped plan the level select UI structure and button setup. | Used as the level selection screen. |
 | `assets/scenes/MainGameScene.fire` | Helped debug the main scene hierarchy and runtime setup. | Used as the first gameplay scene. |
+| `assets/resources/tiles/mario map.tmx` | Helped inspect TMX layers, object groups, map size, start point, finish point, and Cocos-compatible TMX version. | Used as the first playable map. |
+| `assets/resources/player/mario_grouped_small.plist` | Helped connect the grouped Mario atlas to script-driven animations. | Used by `PlayerController` for idle, walk, jump, and climb frames. |
 | `README.md` | Helped organize current features, gameplay instructions, grading status, and setup notes. | Used as the project README. |
 | `AI_reference.md` | Helped organize the AI usage record. | Will be exported as `AI_reference.pdf`. |
 
@@ -193,6 +198,99 @@ ChatGPT separated the level intro logic from the ground generator so that the sa
 
 The first frame can show a simple `LEVEL 1` text to avoid an empty black frame. After the water animation frames are ready, the intro text switches to a separate ready group. This also avoids relying on unsupported bitmap-font characters such as hyphens or visually unclear spaces.
 
+---
+
+### Record 9: TMX map setup and Cocos compatibility
+
+**Prompt (translated)**
+
+> I redrew the map with 16x16 tiles. Please confirm the map position, camera size, and what I need to set in Cocos Creator.
+
+**AI Response Summary**
+
+ChatGPT helped inspect the TMX map size, layer names, object groups, and Cocos Creator 2.4.8 import issues. The map was confirmed as `240 x 40` tiles, with `16 x 16` tiles, for a total size of `3840 x 640`.
+
+**Final Code / Files Used**
+
+| File | AI-assisted Change |
+|---|---|
+| `assets/resources/tiles/mario map.tmx` | Used as the first playable TMX map. The TMX `version` is adjusted back to `1.0` after Tiled saves it as `1.10`, because Cocos Creator 2.4.8 reports the newer version as unsupported. |
+| `assets/scenes/MainGameScene.fire` | Updated the map node setup and connected the TMX map to the main gameplay scene. |
+
+**Refinement & Explanation**
+
+The map remains `3840 x 640`, so the current camera view size of `960 x 640` is still appropriate. The TMX `start point` object group is used to place Mario at runtime.
+
+---
+
+### Record 10: Grouped Mario animations and vine climbing
+
+**Prompt (translated)**
+
+> Change Mario's animation to use my latest grouped version. Normal left/right movement should use walk, forward movement with jump should use forward jump, straight up jump should use upward jump, idle should use idle, and vines should switch to climbing.
+
+**AI Response Summary**
+
+ChatGPT helped update `PlayerController` to load the grouped Mario atlas and switch animation frames based on movement, jump state, and climbing state. It also added vine climbing using sensor colliders and prevented held jump input from repeatedly triggering jumps.
+
+**Final Code / Files Used**
+
+| File | AI-assisted Change |
+|---|---|
+| `assets/scripts/PlayerController.ts` | Added grouped animation frame lists, jump animation locking, vine climbing, TMX start-point spawning, and improved grounded checks. |
+| `assets/resources/player/mario_grouped_small.plist` | Used as the sprite atlas for idle, walk, jump, and climb frames. |
+
+**Refinement & Explanation**
+
+The Player physics root should stay at scale `1`. Scaling the same node that owns `RigidBody` and `PhysicsBoxCollider` also scales the collider and can cause unstable collision behavior. If a larger visual Mario is needed later, the visual sprite should be placed under a child node while the physics root remains unscaled.
+
+---
+
+### Record 11: Tile collision generation and collision debugging
+
+**Prompt (translated)**
+
+> Except for `no collide`, the other map layers should have collision. The issue may be that the collision range is too large. Can you read my tile map and write the actual collision range into code?
+
+**AI Response Summary**
+
+ChatGPT inspected the TMX layers and generated collision bounds from the alpha pixels of the tiles actually used by the map. It then added a runtime collision builder that creates physics colliders from TMX tile layers.
+
+**Final Code / Files Used**
+
+| File | AI-assisted Change |
+|---|---|
+| `assets/scripts/TileCollisionBounds.ts` | Generated per-GID collision bounds from the used tile images. |
+| `assets/scripts/TileMapCollisionBuilder.ts` | Generates static colliders for solid tile layers, sensor colliders for vines, ignores `no collide`, and merges continuous colliders to reduce seams. |
+| `assets/scenes/MainGameScene.fire` | Connected `TileMapCollisionBuilder` to the TMX map node. |
+
+**Refinement & Explanation**
+
+The current collision rule is: `Solid Layer Names = *`, `Ignored Layer Names = no collide`, `Vine Layer Names = vines`, and `Enable Top Only Layers = false`. Top-only collision was tested but disabled because it allowed Mario to pass through objects from the side.
+
+---
+
+### Record 12: Camera follow
+
+**Prompt (translated)**
+
+> The camera does not move to the right.
+
+**AI Response Summary**
+
+ChatGPT added a camera follow script that tracks Mario horizontally and clamps the camera inside the TMX map bounds.
+
+**Final Code / Files Used**
+
+| File | AI-assisted Change |
+|---|---|
+| `assets/scripts/CameraFollow.ts` | Follows the player on the X axis and clamps the camera inside the map bounds. |
+| `assets/scenes/MainGameScene.fire` | Attached `CameraFollow` to `Main Camera`. |
+
+**Refinement & Explanation**
+
+The map size is still `3840 x 640`, and the camera view is `960 x 640`, so horizontal camera follow is enough for the current level. Vertical following is disabled.
+
 ## 4. Current AI Usage Summary
 
 AI was mainly used for:
@@ -204,27 +302,29 @@ AI was mainly used for:
 - Improving pixel-art and bitmap font display.
 - Debugging the main gameplay scene.
 - Implementing Mario movement and animation.
-- Generating the first-level ground.
-- Building the reusable level intro and animated water loading background.
+- Prototyping the first generated ground and level intro flow before the TMX map workflow replaced them.
+- Importing and validating a TMX-based playable map.
+- Generating tile-based physics colliders and collision bounds.
+- Implementing grouped Mario animations and vine climbing.
+- Adding horizontal camera follow.
 - Drafting and updating project documentation.
 
 ## 5. Current COCO Setup Notes
 
 | Node | Component / Setup |
 |---|---|
-| `Canvas` | Attach `LevelIntro`; assign `Intro Root` to `LevelIntroUI`. |
-| `Canvas > LevelIntroUI > WaterBackground` | Attach `AnimatedTileBackground`; set atlas to `tiles/tiles`; set frames to `tiles_570.png,tiles_571.png,tiles_572.png,tiles_573.png`. |
-| `Canvas > LevelIntroUI` | Attach `IntroTextGroupSwitcher`; assign `InitialTextGroup` and `ReadyTextGroup`. |
-| `Canvas > World > Map` or `Ground` | Attach `GroundGenerator`; keep a manually placed `tiles_272` as the starting position marker. |
-| `Canvas > World > Player` | Attach `PlayerController`; adjust visual scale in COCO if needed. |
+| `Canvas > Main Camera` | Attach `CameraFollow`; set Target Node Path to `Canvas/World/Player/mario_grouped_small.plist`; set Map Node Path to `Canvas/World/Map/mario map`. |
+| `Canvas > World > Map > mario map` | Attach `cc.TiledMap` and `TileMapCollisionBuilder`; set Solid Layer Names to `*`, Ignored Layer Names to `no collide`, Vine Layer Names to `vines`, and keep Enable Top Only Layers disabled. |
+| `Canvas > World > Player > mario_grouped_small.plist` | Attach `PlayerController`, `RigidBody`, `PhysicsBoxCollider`, and `Sprite`; keep the physics root scale at `1`. |
 
 ## 6. Remaining Work
 
 | Item | Status |
 |---|:---:|
-| Camera follow | Not yet |
+| Camera follow | Basic version complete |
 | Question block behavior and animation | Not yet |
 | Enemy behavior | Not yet |
+| Coin / flower / item behavior | Not yet |
 | Score, timer, life UI | Not yet |
 | Sound effects and BGM | Not yet |
 | Firebase deployment | Not yet |

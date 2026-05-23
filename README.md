@@ -2,7 +2,7 @@
 
 This project is a Mario-style 2D platformer built with **Cocos Creator 2.4.8**.
 
-The current version already includes the basic game flow: the player can enter the start menu, move to the level select screen, and click `LEVEL 1` to enter the main game scene. The first playable scene now includes a level intro overlay, generated ground, basic Mario movement, jump control, and walking animation. More gameplay systems such as camera follow, enemies, question blocks, UI, sound effects, and Firebase deployment will be added later.
+The current version already includes the basic game flow: the player can enter the start menu, move to the level select screen, and click `LEVEL 1` to enter the main game scene. The first playable scene now uses a TMX tile map, generated tile collision, camera follow, Mario movement, jump control, grouped Mario animations, and vine climbing. More gameplay systems such as enemies, question blocks, UI, sound effects, and Firebase deployment will be added later.
 
 ## Website and Project Information
 
@@ -18,18 +18,18 @@ The current version already includes the basic game flow: the player can enter t
 |---|---:|:---:|---|
 | Start menu | 5% | Y | The start screen is complete, including a Mario-style background, title image, and `START` button. |
 | Level select | 5% | Y | The level select screen is complete, including the `LEVEL SELECT` title and `LEVEL 1` button. |
-| Game view / game start / game over | 5% | Partial | `MainGameScene` is created and can be entered from `LEVEL 1`. The level intro, ground, and player control are implemented, but game over is not finished yet. |
+| Game view / game start / game over | 5% | Partial | `MainGameScene` is created and can be entered from `LEVEL 1`. The TMX map, player control, camera follow, and tile collision are implemented, but game over is not finished yet. |
 
 ### Basic Rules
 
 | Item | Points | Status | Notes |
 |---|---:|:---:|---|
-| World map: physics, gravity, collision | 10% | Partial | Basic physics, gravity, generated ground, and ground collision are implemented. More map objects are still needed. |
-| Background and camera follow player | 10% | N | Camera follow is not implemented yet. |
-| At least one world map | 10% | Partial | A generated first-level ground exists. Decorative map objects still need to be placed. |
-| Static wall | 5% | N | Not implemented yet. |
+| World map: physics, gravity, collision | 10% | Partial | Physics, gravity, TMX map collision, vine sensors, and tile-based collision generation are implemented. Some gameplay objects still need behavior. |
+| Background and camera follow player | 10% | Y | `CameraFollow` follows Mario horizontally and clamps the view inside the map bounds. |
+| At least one world map | 10% | Y | `mario map.tmx` is used as the first playable map. |
+| Static wall | 5% | Partial | Solid tile layers generate static colliders. Collision tuning is still being tested. |
 | Question blocks | 5% | N | Question block assets are available, but interaction logic is not implemented yet. |
-| Player movement, jump, hurt, death, respawn | 15% | Partial | Movement, jump, and walking animation are implemented. Hurt, death, and respawn are not implemented yet. |
+| Player movement, jump, hurt, death, respawn | 15% | Partial | Movement, jump, grouped animations, and vine climbing are implemented. Hurt, death, and respawn are not implemented yet. |
 | Enemies and stomp rules | 15% | N | Enemy assets are imported. Goomba is planned as the first enemy. |
 | Super mushroom makes Mario bigger | 5% | N | Planned as the first question block reward. |
 
@@ -37,7 +37,7 @@ The current version already includes the basic game flow: the player can enter t
 
 | Item | Points | Status | Notes |
 |---|---:|:---:|---|
-| Player walk / jump animations | 5% | Partial | Mario walking animation is implemented through script using frames from `mario_small.plist`. Jump animation is basic and can still be improved. |
+| Player walk / jump animations | 5% | Partial | Mario idle, walk, forward jump, upward jump, and climb animations are implemented through `mario_grouped_small`. |
 | Enemy animation | Up to 5% | N | Enemy sprites are imported, but animation clips are not created yet. |
 
 ### Sound Effects
@@ -61,7 +61,7 @@ The current version already includes the basic game flow: the player can enter t
 
 | Item | Points | Status | Notes |
 |---|---:|:---:|---|
-| Appearance | 10% | Partial | The start screen, level select screen, and level intro use Mario-style assets, bitmap fonts, and pixel-art rendering settings. The in-game map still needs more decoration. |
+| Appearance | 10% | Partial | The start screen, level select screen, TMX map, Mario sprites, and pixel-art rendering settings are in place. Some gameplay objects still need polish. |
 | Firebase bonus | 5% | N | Not deployed yet. |
 | Leaderboard / multiplayer / other bonus | Up to 10% | N | Not implemented yet. |
 | Git version control | 5% | N | The first commit will be created after the current stable version is confirmed. |
@@ -74,8 +74,8 @@ The current version can test the basic flow:
 2. Click **START** on the start screen.
 3. Click **LEVEL 1** on the level select screen.
 4. The game enters `MainGameScene`.
-5. The level intro appears first.
-6. After the generated ground is ready, the intro fades out and Mario becomes controllable.
+5. Mario spawns from the TMX `start point` object group.
+6. The camera follows Mario as he moves through the map.
 
 ## Current Features
 
@@ -86,11 +86,15 @@ The current version can test the basic flow:
 - `LEVEL 1` switches from `LevelSelectScene` to `MainGameScene`.
 - Imported TA-provided assets from `audio`, `pictures`, `player`, `enemies`, `tiles`, `fonts`, and `others`.
 - Adjusted pixel-art textures and bitmap fonts for clearer display.
-- Added a reusable level intro overlay inside `MainGameScene`.
-- Added animated water loading background using `tiles_570.png` to `tiles_573.png`.
-- Added intro text switching from `LEVEL 1` to `GET` / `READY`.
-- Added generated first-level ground using `tiles_271.png`, `tiles_272.png`, and `tiles_273.png`.
-- Added basic Mario movement, jump, walking animation, and intro lock behavior.
+- Added a TMX-based first level using `assets/resources/tiles/mario map.tmx`.
+- Added generated physics colliders for TMX tile layers.
+- Added alpha-based tile collision bounds through `TileCollisionBounds.ts`.
+- Added horizontal camera follow through `CameraFollow.ts`.
+- Added grouped Mario animation support through `mario_grouped_small`.
+- Added Mario idle, walk, forward jump, upward jump, and climb animation switching.
+- Added vine climbing through sensor colliders.
+- Added Mario spawn from the TMX `start point` object group.
+- Added basic Mario movement, jump, walking animation, and collision tuning.
 
 ## Controls
 
@@ -107,6 +111,7 @@ The current version can test the basic flow:
 |---|---|
 | Move left / right | `A / D` or arrow keys |
 | Jump | `Space` or `W` |
+| Climb vines | `W / S` or up / down arrow keys while touching vines |
 
 ## Project Structure
 
@@ -127,10 +132,9 @@ assets/
   scripts/
     SceneChanger.ts
     PlayerController.ts
-    GroundGenerator.ts
-    LevelIntro.ts
-    AnimatedTileBackground.ts
-    IntroTextGroupSwitcher.ts
+    CameraFollow.ts
+    TileMapCollisionBuilder.ts
+    TileCollisionBounds.ts
 ```
 
 ## Scene Overview
@@ -139,7 +143,7 @@ assets/
 |---|---|---|
 | `StartScene` | Game start screen | Complete for the current version |
 | `LevelSelectScene` | Level selection screen | Complete for the current version |
-| `MainGameScene` | Main gameplay scene | Includes level intro, generated ground, and basic Mario control |
+| `MainGameScene` | Main gameplay scene | Includes TMX map, tile collision, camera follow, and Mario control |
 
 ## Main Scripts
 
@@ -155,84 +159,61 @@ This script is attached to UI buttons and uses `cc.director.loadScene()` to swit
 
 ### `PlayerController.ts`
 
-Controls Mario movement, jump, sprite direction, walking animation, and level intro locking.
+Controls Mario movement, jump, sprite direction, grouped animation, vine climbing, and TMX start-point spawning.
 
 | Feature | Notes |
 |---|---|
 | Movement | Supports `A / D` and left / right arrow keys. |
 | Jump | Supports `W` and `Space`. |
-| Animation | Uses side-facing frames from `mario_small.plist`. |
-| Intro lock | Mario is hidden and physics is paused until the level is ready. |
+| Animation | Uses grouped frames from `mario_grouped_small`. |
+| Climbing | Uses vine sensor colliders and `W / S` or up / down input. |
+| Spawn | Reads the first object in the TMX `start point` object group. |
 
-### `GroundGenerator.ts`
+### `CameraFollow.ts`
 
-Generates the first-level ground based on the position of the sample `tiles_272` node placed in COCO.
-
-| Setting | Notes |
-|---|---|
-| Left edge tile | `tiles_271.png` |
-| Middle tile | `tiles_272.png` |
-| Right edge tile | `tiles_273.png` |
-| Tile scale | `3` |
-| Collider | Creates a long static ground collider. |
-
-### `LevelIntro.ts`
-
-Controls the full-screen intro overlay.
-
-| Feature | Notes |
-|---|---|
-| Intro root | Uses `LevelIntroUI`. |
-| Minimum display time | Keeps the intro visible long enough to be readable. |
-| Fade out | Fades out after the level emits `level-ready`. |
-
-### `AnimatedTileBackground.ts`
-
-Builds a tiled animated background for the level intro.
+Follows Mario horizontally and clamps the camera inside the TMX map bounds.
 
 | Setting | Notes |
 |---|---|
-| Atlas path | `tiles/tiles` |
-| Frames | `tiles_570.png`, `tiles_571.png`, `tiles_572.png`, `tiles_573.png` |
-| Layering | Keeps the water background below intro text. |
+| Target Node Path | `Canvas/World/Player/mario_grouped_small.plist` |
+| Map Node Path | `Canvas/World/Map/mario map` |
+| View Size | Uses `960 x 640` for the current game view. |
 
-### `IntroTextGroupSwitcher.ts`
+### `TileMapCollisionBuilder.ts`
 
-Switches between two manually arranged text groups in COCO.
+Builds physics colliders from the TMX tile layers at runtime.
 
-| Group | Purpose |
+| Setting | Notes |
 |---|---|
-| `InitialTextGroup` | Displays the first-frame text, such as `LEVEL 1`. |
-| `ReadyTextGroup` | Displays the water-loading text, such as separate `GET` and `READY` labels. |
+| Solid Layer Names | `*`, meaning all non-ignored tile layers can collide. |
+| Ignored Layer Names | `no collide`. |
+| Vine Layer Names | `vines`, generated as sensor colliders. |
+| Top Only Layers | Disabled for the current map so solid objects cannot be walked through from the side. |
+
+### `TileCollisionBounds.ts`
+
+Stores generated per-tile collision bounds based on the visible alpha pixels of the used tile graphics.
 
 ## COCO Setup Notes
-
-### `Canvas`
-
-| Component | Important Setting |
-|---|---|
-| `LevelIntro` | Assign `Intro Root` to `LevelIntroUI`. `Min Display Time` controls how long the loading screen stays visible. |
-
-### `Canvas > LevelIntroUI`
-
-| Node / Component | Important Setting |
-|---|---|
-| `WaterBackground` | Attach `AnimatedTileBackground`. Set Atlas Path to `tiles/tiles`. Set Frame Names to `tiles_570.png,tiles_571.png,tiles_572.png,tiles_573.png`. |
-| `InitialTextGroup` | Place the first-frame text here, such as `LEVEL 1`. |
-| `ReadyTextGroup` | Place the water-loading text here. Use separate labels for `GET` and `READY` so spacing can be adjusted visually. |
-| `IntroTextGroupSwitcher` | Attach to `LevelIntroUI`. Assign `Initial Group` and `Ready Group`. |
 
 ### `Canvas > World > Map`
 
 | Component | Important Setting |
 |---|---|
-| `GroundGenerator` | Attach to `Map` or `Ground`, not to the sample `tiles_272` node. The script uses the sample `tiles_272` position as the ground starting point. |
+| `cc.TiledMap` | Use `assets/resources/tiles/mario map.tmx` as the first playable map. |
+| `TileMapCollisionBuilder` | Attach to the TMX map node. Set `Solid Layer Names` to `*`, `Ignored Layer Names` to `no collide`, and `Vine Layer Names` to `vines`. Keep `Enable Top Only Layers` disabled for the current map. |
+
+### `Canvas > Main Camera`
+
+| Component | Important Setting |
+|---|---|
+| `CameraFollow` | Set Target Node Path to `Canvas/World/Player/mario_grouped_small.plist` and Map Node Path to `Canvas/World/Map/mario map`. |
 
 ### `Canvas > World > Player`
 
 | Component | Important Setting |
 |---|---|
-| `PlayerController` | Controls Mario movement and animation. If Mario size needs to change, adjust the Player node scale directly in COCO instead of hardcoding it in script. |
+| `PlayerController` | Controls Mario movement, animation, jumping, vine climbing, and TMX start-point spawning. Keep the physics root scale at `1`; if visual scaling is needed later, use a child sprite node instead of scaling the physics node. |
 
 ## How to Run Locally
 
@@ -247,9 +228,9 @@ StartScene -> LevelSelectScene -> MainGameScene
 
 ## Next Development Steps
 
-1. Add camera follow so the view follows Mario to the right.
-2. Manually place question blocks, pipes, bushes, clouds, and other decorative or interactive map objects in COCO.
-3. Implement question block animation and hit behavior.
-4. Add enemies, coins, score, timer, and life UI.
+1. Implement question block animation and hit behavior from the TMX `questions` object group.
+2. Add enemy behavior from the TMX enemy object groups.
+3. Add coin collection and flower / item behavior from the TMX object groups.
+4. Add score, timer, and life UI.
 5. Add BGM and sound effects such as jump, coin, and stomp.
 6. Build the web version and deploy it to Firebase.
