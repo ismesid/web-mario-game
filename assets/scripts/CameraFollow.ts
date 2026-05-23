@@ -9,16 +9,25 @@ export default class CameraFollow extends cc.Component {
     mapNodePath: string = 'Canvas/World/Map/mario map';
 
     @property
-    viewWidth: number = 960;
+    viewWidth: number = 640;
 
     @property
-    viewHeight: number = 640;
+    viewHeight: number = 426.67;
+
+    @property
+    zoomRatio: number = 1.5;
+
+    @property
+    useCameraVisibleSize: boolean = true;
 
     @property
     followX: boolean = true;
 
     @property
-    followY: boolean = false;
+    followY: boolean = true;
+
+    @property
+    verticalOffset: number = 0;
 
     @property
     smoothTime: number = 0.08;
@@ -26,14 +35,37 @@ export default class CameraFollow extends cc.Component {
     private targetNode: cc.Node = null;
     private mapNode: cc.Node = null;
     private initialPosition: cc.Vec2 = null;
+    private camera: cc.Camera = null;
 
     onLoad() {
         this.targetNode = cc.find(this.targetNodePath);
         this.mapNode = cc.find(this.mapNodePath);
         this.initialPosition = cc.v2(this.node.x, this.node.y);
+        this.camera = this.getComponent(cc.Camera);
+        this.applyCameraZoom();
+    }
+
+    start() {
+        const nextPosition = this.getNextCameraPosition();
+        if (nextPosition) {
+            this.node.setPosition(nextPosition);
+        }
     }
 
     lateUpdate(dt: number) {
+        this.applyCameraZoom();
+
+        const nextPosition = this.getNextCameraPosition();
+        if (!nextPosition) {
+            return;
+        }
+
+        const t = this.smoothTime <= 0 ? 1 : Math.min(1, dt / this.smoothTime);
+        this.node.x = this.node.x + (nextPosition.x - this.node.x) * t;
+        this.node.y = this.node.y + (nextPosition.y - this.node.y) * t;
+    }
+
+    private getNextCameraPosition() {
         if (!this.targetNode || !cc.isValid(this.targetNode)) {
             this.targetNode = cc.find(this.targetNodePath);
         }
@@ -41,30 +73,53 @@ export default class CameraFollow extends cc.Component {
             this.mapNode = cc.find(this.mapNodePath);
         }
         if (!this.targetNode || !this.node.parent) {
-            return;
+            return null;
         }
 
         const targetWorld = this.targetNode.convertToWorldSpaceAR(cc.v2(0, 0));
         const targetLocal = this.node.parent.convertToNodeSpaceAR(targetWorld);
         let nextX = this.followX ? targetLocal.x : this.initialPosition.x;
-        let nextY = this.followY ? targetLocal.y : this.initialPosition.y;
+        let nextY = this.followY ? targetLocal.y + this.verticalOffset : this.initialPosition.y;
 
         if (this.mapNode) {
             const bounds = this.getMapBoundsInCameraParent();
             if (bounds) {
-                const minX = bounds.left + this.viewWidth * 0.5;
-                const maxX = bounds.right - this.viewWidth * 0.5;
-                const minY = bounds.bottom + this.viewHeight * 0.5;
-                const maxY = bounds.top - this.viewHeight * 0.5;
+                const viewSize = this.getVisibleWorldSize();
+                const minX = bounds.left + viewSize.width * 0.5;
+                const maxX = bounds.right - viewSize.width * 0.5;
+                const minY = bounds.bottom + viewSize.height * 0.5;
+                const maxY = bounds.top - viewSize.height * 0.5;
 
                 nextX = this.clampToRange(nextX, minX, maxX);
                 nextY = this.followY ? this.clampToRange(nextY, minY, maxY) : this.initialPosition.y;
             }
         }
 
-        const t = this.smoothTime <= 0 ? 1 : Math.min(1, dt / this.smoothTime);
-        this.node.x = this.node.x + (nextX - this.node.x) * t;
-        this.node.y = this.node.y + (nextY - this.node.y) * t;
+        return cc.v2(nextX, nextY);
+    }
+
+    private applyCameraZoom() {
+        if (!this.camera) {
+            this.camera = this.getComponent(cc.Camera);
+        }
+        if (this.camera && this.camera.zoomRatio !== this.zoomRatio) {
+            this.camera.zoomRatio = this.zoomRatio;
+        }
+    }
+
+    private getVisibleWorldSize() {
+        if (!this.useCameraVisibleSize || !this.camera || this.camera.zoomRatio <= 0) {
+            return cc.size(this.viewWidth, this.viewHeight);
+        }
+
+        const visibleSize = cc.size(
+            this.node.width || cc.view.getVisibleSize().width,
+            this.node.height || cc.view.getVisibleSize().height
+        );
+        return cc.size(
+            visibleSize.width / this.camera.zoomRatio,
+            visibleSize.height / this.camera.zoomRatio
+        );
     }
 
     private getMapBoundsInCameraParent() {
