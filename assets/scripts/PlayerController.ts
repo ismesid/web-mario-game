@@ -33,6 +33,9 @@ export default class PlayerController extends cc.Component {
     vineColliderTag: number = 1001;
 
     @property
+    coinColliderTag: number = 2002;
+
+    @property
     autoSetColliderSize: boolean = true;
 
     @property
@@ -590,10 +593,18 @@ export default class PlayerController extends cc.Component {
             return;
         }
 
+        if (this.isCoinCollider(otherCollider)) {
+            return;
+        }
+
         this.refreshGroundContact(contact, selfCollider, otherCollider);
     }
 
     onPreSolve(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
+        if (this.isCoinCollider(otherCollider)) {
+            return;
+        }
+
         if (this.shouldPassThroughWhileClimbing(contact, selfCollider, otherCollider)) {
             contact.disabledOnce = true;
             return;
@@ -608,6 +619,10 @@ export default class PlayerController extends cc.Component {
             if (!this.canClimb()) {
                 this.stopClimbing(false);
             }
+            return;
+        }
+
+        if (this.isCoinCollider(otherCollider)) {
             return;
         }
 
@@ -720,6 +735,10 @@ export default class PlayerController extends cc.Component {
 
     private isVineCollider(otherCollider: cc.Collider) {
         return otherCollider && otherCollider.tag === this.vineColliderTag;
+    }
+
+    private isCoinCollider(otherCollider: cc.Collider) {
+        return otherCollider && otherCollider.tag === this.coinColliderTag;
     }
 
     private addUniqueCollider(colliders: cc.Collider[], collider: cc.Collider) {
