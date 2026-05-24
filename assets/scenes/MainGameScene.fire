@@ -78,10 +78,10 @@
     "_active": true,
     "_components": [
       {
-        "__id__": 50
+        "__id__": 51
       },
       {
-        "__id__": 51
+        "__id__": 52
       }
     ],
     "_prefab": null,
@@ -301,8 +301,8 @@
     "_enabled": true,
     "backgroundSpritePath": "pictures/map_background",
     "mapNodePath": "Canvas/World/Map/mario map",
-    "scrollFactorX": 0.16,
-    "scrollFactorY": 1,
+    "scrollFactorX": 0.28,
+    "scrollFactorY": 0.08,
     "extraScale": 1.05,
     "repeatHorizontally": true,
     "followCameraY": true,
@@ -751,6 +751,9 @@
       },
       {
         "__id__": 49
+      },
+      {
+        "__id__": 50
       }
     ],
     "_prefab": null,
@@ -1425,7 +1428,7 @@
       "__id__": 16
     },
     "_children": [],
-    "_active": true,
+    "_active": false,
     "_components": [
       {
         "__id__": 34
@@ -1641,7 +1644,7 @@
       "__id__": 16
     },
     "_children": [],
-    "_active": false,
+    "_active": true,
     "_components": [
       {
         "__id__": 40
@@ -1978,6 +1981,30 @@
     "collectEffectDuration": 0.35,
     "collectEffectRise": 12,
     "_id": "acqB3isD9BTbH94b86nNFr"
+  },
+  {
+    "__type__": "2a9bfJmGM5JX6ic4qsG0YMV",
+    "_name": "",
+    "_objFlags": 0,
+    "node": {
+      "__id__": 16
+    },
+    "_enabled": true,
+    "objectGroupName": "questions",
+    "questionTexturePath": "question_blocks/question_spin",
+    "usedTexturePath": "question_blocks/question_used",
+    "blockWidth": 16,
+    "blockHeight": 16,
+    "frameCount": 4,
+    "framesPerSecond": 7,
+    "zIndex": 450,
+    "bumpDistance": 4,
+    "bumpDuration": 0.08,
+    "hitHorizontalInset": 4,
+    "spawnCoinOnHit": true,
+    "coinSurfaceOffsetY": 0,
+    "maxSurfaceSearchHeight": 160,
+    "_id": "93pMtE4/ZNY7s6ssmCi90a"
   },
   {
     "__type__": "cc.Canvas",

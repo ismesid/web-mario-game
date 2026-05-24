@@ -45,6 +45,7 @@ export default class CoinSpawner extends cc.Component {
     private frames: cc.SpriteFrame[] = [];
     private collectEffectFrame: cc.SpriteFrame = null;
     private animationTimer = 0;
+    private pendingSpawns: { centerX: number; bottomY: number; name: string }[] = [];
 
     onLoad() {
         this.scheduleOnce(() => this.rebuild(), 0);
@@ -87,6 +88,7 @@ export default class CoinSpawner extends cc.Component {
 
             this.frames = this.createFrames(texture);
             this.buildCoins(tileMap, objectGroup);
+            this.flushPendingSpawns();
         });
         this.loadCollectEffectFrame();
     }
@@ -162,6 +164,43 @@ export default class CoinSpawner extends cc.Component {
         coinNode.destroy();
     }
 
+    spawnCoinAtLocalBottom(centerX: number, bottomY: number, name: string = 'Coin_Dynamic') {
+        if (this.frames.length === 0) {
+            this.pendingSpawns.push({ centerX, bottomY, name });
+            return null;
+        }
+
+        const root = this.getOrCreateRoot();
+        const coinNode = new cc.Node(name);
+        coinNode.parent = root;
+        coinNode.setContentSize(this.coinWidth, this.coinHeight);
+        coinNode.setAnchorPoint(0.5, 0.5);
+        coinNode.setPosition(centerX, bottomY + this.coinHeight * 0.5);
+
+        const sprite = coinNode.addComponent(cc.Sprite);
+        sprite.sizeMode = cc.Sprite.SizeMode.RAW;
+        sprite.trim = false;
+        const frameIndex = Math.floor(this.animationTimer * this.framesPerSecond) % this.frames.length;
+        sprite.spriteFrame = this.frames[frameIndex] || this.frames[0];
+        this.coinSprites.push(sprite);
+
+        this.addCoinCollider(coinNode);
+        return coinNode;
+    }
+
+    private flushPendingSpawns() {
+        if (this.pendingSpawns.length === 0) {
+            return;
+        }
+
+        const spawns = this.pendingSpawns.slice();
+        this.pendingSpawns = [];
+        for (let i = 0; i < spawns.length; i++) {
+            const spawn = spawns[i];
+            this.spawnCoinAtLocalBottom(spawn.centerX, spawn.bottomY, spawn.name);
+        }
+    }
+
     private loadCollectEffectFrame() {
         cc.loader.loadRes(this.collectEffectAtlasPath, cc.SpriteAtlas, (err: Error, atlas: cc.SpriteAtlas) => {
             if (err || !atlas || !cc.isValid(this.node)) {
@@ -228,6 +267,18 @@ export default class CoinSpawner extends cc.Component {
         if (index !== -1) {
             this.coinSprites.splice(index, 1);
         }
+    }
+
+    private getOrCreateRoot() {
+        let root = this.node.getChildByName(this.generatedRootName);
+        if (!root) {
+            root = new cc.Node(this.generatedRootName);
+            root.parent = this.node;
+            root.setPosition(0, 0);
+        }
+
+        root.zIndex = this.zIndex;
+        return root;
     }
 
     private getObjectCenterX(object: any, fallbackX: number) {
