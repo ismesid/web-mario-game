@@ -1,3 +1,5 @@
+import GameAudio from './GameAudio';
+
 const { ccclass, property } = cc._decorator;
 
 @ccclass
@@ -80,6 +82,18 @@ export default class PlayerController extends cc.Component {
     @property
     colliderHeight: number = 18;
 
+    @property
+    jumpSfxPath: string = 'audio/jump';
+
+    @property
+    climbSfxPath: string = 'audio/climb';
+
+    @property
+    sfxVolume: number = 100;
+
+    @property
+    climbSfxInterval: number = 0.25;
+
     private body: cc.RigidBody = null;
     private movingLeft = false;
     private movingRight = false;
@@ -103,6 +117,7 @@ export default class PlayerController extends cc.Component {
     private isDamageInvincible = false;
     private invincibleTimer = 0;
     private blinkTimer = 0;
+    private climbSfxTimer = 0;
     private spawnPosition: cc.Vec2 = null;
     private defaultGravityScale = 1;
     private readonly groundCheckTolerance = 8;
@@ -184,7 +199,7 @@ export default class PlayerController extends cc.Component {
         }
 
         if (this.isClimbing) {
-            this.updateClimbing();
+            this.updateClimbing(dt);
             this.enforceMapBoundary();
             return;
         }
@@ -207,6 +222,7 @@ export default class PlayerController extends cc.Component {
             this.jumpAnimationTimer = this.jumpAnimationLockTime;
             this.jumpStartedWithForwardSpeed = Math.abs(velocityX) > 20 || this.movingLeft || this.movingRight;
             this.groundRunTime = 0;
+            this.playJumpSfx();
         } else {
             this.updateRunUpTimer(velocityX, grounded);
         }
@@ -216,7 +232,7 @@ export default class PlayerController extends cc.Component {
         this.updateMarioFrame(velocityX, velocityY);
     }
 
-    private updateClimbing() {
+    private updateClimbing(dt: number) {
         if (!this.canClimb()) {
             this.stopClimbing(false);
             return;
@@ -240,11 +256,13 @@ export default class PlayerController extends cc.Component {
             this.jumpAnimationTimer = this.jumpAnimationLockTime;
             this.jumpStartedWithForwardSpeed = Math.abs(velocityX) > 20 || this.movingLeft || this.movingRight;
             this.body.linearVelocity = cc.v2(velocityX, this.jumpSpeed);
+            this.playJumpSfx();
             this.updateMarioFrame(velocityX, this.jumpSpeed);
             return;
         }
 
         this.body.linearVelocity = cc.v2(velocityX, velocityY);
+        this.updateClimbSfx(dt, Math.abs(velocityY) > 1);
         this.setAnimationFrame('climb', this.climbFrames, 8, Math.abs(velocityY) > 1);
     }
 
@@ -339,6 +357,7 @@ export default class PlayerController extends cc.Component {
         }
 
         this.isClimbing = false;
+        this.climbSfxTimer = 0;
         this.body.gravityScale = this.defaultGravityScale;
 
         if (!keepVelocity) {
@@ -516,6 +535,25 @@ export default class PlayerController extends cc.Component {
         this.body.syncPosition(true);
     }
 
+    private playJumpSfx() {
+        GameAudio.playSfx(this.jumpSfxPath, this.sfxVolume);
+    }
+
+    private updateClimbSfx(dt: number, isMovingVertically: boolean) {
+        if (!isMovingVertically) {
+            this.climbSfxTimer = 0;
+            return;
+        }
+
+        this.climbSfxTimer -= dt;
+        if (this.climbSfxTimer > 0) {
+            return;
+        }
+
+        GameAudio.playSfx(this.climbSfxPath, this.sfxVolume);
+        this.climbSfxTimer = Math.max(0.05, this.climbSfxInterval);
+    }
+
     private getMapWorldBounds() {
         const mapNode = cc.find(this.boundsMapNodePath);
         if (!mapNode) {
@@ -564,7 +602,18 @@ export default class PlayerController extends cc.Component {
             return;
         }
 
-        if (this.jumpAnimationTimer > 0 || (Math.abs(velocityY) > 20 && !this.isGrounded())) {
+        const airborne = !this.isGrounded();
+        if (airborne) {
+            if (this.jumpStartedWithForwardSpeed) {
+                this.setAnimationFrame('jumpForwardAirborne', this.jumpForwardFrames, 1, false);
+                return;
+            }
+
+            this.setAnimationFrame('jumpUp', this.jumpUpFrames, 10, true);
+            return;
+        }
+
+        if (this.jumpAnimationTimer > 0 || Math.abs(velocityY) > 20) {
             const hasForwardSpeed = this.jumpAnimationTimer > 0
                 ? this.jumpStartedWithForwardSpeed
                 : Math.abs(velocityX) > 20 || this.movingLeft || this.movingRight;

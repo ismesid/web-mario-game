@@ -825,6 +825,13 @@
       "__id__": 9
     },
     "_enabled": true,
+    "bgmVolume": 100,
+    "sceneBgmPath": "audio/bgm_1",
+    "defaultBgmPath": "audio/bgm_1",
+    "gameBgmPath": "audio/bgm_3",
+    "gameSceneName": "MainGameScene",
+    "buttonSfxPath": "audio/reserve",
+    "buttonSfxVolume": 100,
     "_id": "9etIFRxARJ8KBBQ0VKreGT"
   },
   {

@@ -1,4 +1,5 @@
 import PlayerController from './PlayerController';
+import GameAudio from './GameAudio';
 
 const { ccclass } = cc._decorator;
 
@@ -31,6 +32,8 @@ export default class GoombaEnemy extends cc.Component {
     private flyRise = 48;
     private scoreValue = 200;
     private coinColliderTag = 2002;
+    private stompSfxPath = 'audio/stomp';
+    private sfxVolume = 100;
     private samePlaneTimer = 0;
     private lostPlayerTimer = 0;
     private moveDirection = 1;
@@ -60,7 +63,9 @@ export default class GoombaEnemy extends cc.Component {
         flyDuration: number,
         flyRise: number,
         scoreValue: number,
-        coinColliderTag: number
+        coinColliderTag: number,
+        stompSfxPath: string = 'audio/stomp',
+        sfxVolume: number = 100
     ) {
         this.player = player;
         this.visualNode = visualNode;
@@ -86,6 +91,8 @@ export default class GoombaEnemy extends cc.Component {
         this.flyRise = flyRise;
         this.scoreValue = scoreValue;
         this.coinColliderTag = coinColliderTag;
+        this.stompSfxPath = stompSfxPath || this.stompSfxPath;
+        this.sfxVolume = sfxVolume;
 
         this.node.x = this.initialX;
         this.node.y = this.surfaceY;
@@ -311,6 +318,7 @@ export default class GoombaEnemy extends cc.Component {
         this.stopMoving();
         this.disableCollider();
         this.bouncePlayer(playerNode);
+        GameAudio.playSfx(this.stompSfxPath, this.sfxVolume);
         cc.systemEvent.emit('enemy-defeated', this.scoreValue);
 
         if (this.sprite) {

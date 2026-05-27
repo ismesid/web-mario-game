@@ -1,5 +1,6 @@
 import QuestionBlock from './QuestionBlock';
 import CoinSpawner from './CoinSpawner';
+import GameAudio from './GameAudio';
 
 const { ccclass, property } = cc._decorator;
 
@@ -47,6 +48,12 @@ export default class QuestionBlockSpawner extends cc.Component {
     @property
     maxSurfaceSearchHeight: number = 160;
 
+    @property
+    kickSfxPath: string = 'audio/kick';
+
+    @property
+    kickSfxVolume: number = 100;
+
     private readonly generatedRootName = '__QuestionBlocks';
     private readonly tileMapColliderRootName = '__TileMapColliders';
     private readonly surfaceEpsilon = 0.5;
@@ -57,6 +64,7 @@ export default class QuestionBlockSpawner extends cc.Component {
     private mapTopY = 0;
 
     onLoad() {
+        GameAudio.preloadSfx(this.kickSfxPath);
         this.scheduleOnce(() => this.rebuild(), 0);
     }
 
@@ -142,8 +150,8 @@ export default class QuestionBlockSpawner extends cc.Component {
             block.markUsed();
         }
 
-        if (this.spawnCoinOnHit) {
-            this.spawnCoinAboveBlock(blockNode);
+        if (this.spawnCoinOnHit && this.spawnCoinAboveBlock(blockNode)) {
+            GameAudio.playSfx(this.kickSfxPath, this.kickSfxVolume);
         }
 
         this.playBump(blockNode);
@@ -237,7 +245,7 @@ export default class QuestionBlockSpawner extends cc.Component {
         const coinSpawner = this.getComponent(CoinSpawner);
         if (!coinSpawner) {
             cc.warn('[QuestionBlockSpawner] Cannot spawn question coin without CoinSpawner on the same tile map node.');
-            return;
+            return false;
         }
 
         const blockTop = blockNode.y + this.blockHeight * 0.5;
@@ -245,11 +253,11 @@ export default class QuestionBlockSpawner extends cc.Component {
         const surfaceTop = this.findNearestSurfaceTop(blockNode.x, blockTop, blockNode, maxCoinBottomY);
         if (surfaceTop === null) {
             cc.warn('[QuestionBlockSpawner] Cannot spawn question coin inside map bounds: ' + blockNode.name);
-            return;
+            return false;
         }
 
         const coinBottomY = surfaceTop + this.coinSurfaceOffsetY;
-        coinSpawner.spawnCoinAtLocalBottom(blockNode.x, coinBottomY, 'QuestionCoin_' + blockNode.name);
+        return !!coinSpawner.spawnCoinAtLocalBottom(blockNode.x, coinBottomY, 'QuestionCoin_' + blockNode.name);
     }
 
     private findNearestSurfaceTop(centerX: number, blockTop: number, sourceBlock: cc.Node, maxCoinBottomY: number) {

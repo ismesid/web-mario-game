@@ -1,4 +1,5 @@
 import CoinCollectible from './CoinCollectible';
+import GameAudio from './GameAudio';
 
 const { ccclass, property } = cc._decorator;
 
@@ -40,6 +41,18 @@ export default class CoinSpawner extends cc.Component {
     @property
     collectEffectRise: number = 12;
 
+    @property
+    coinSfxPath: string = 'audio/coin';
+
+    @property
+    sfxVolume: number = 100;
+
+    @property
+    coinSfxBoost: number = 1.5;
+
+    @property
+    coinSfxEngineVolume: number = 0.2;
+
     private readonly generatedRootName = '__Coins';
     private coinSprites: cc.Sprite[] = [];
     private frames: cc.SpriteFrame[] = [];
@@ -48,6 +61,7 @@ export default class CoinSpawner extends cc.Component {
     private pendingSpawns: { centerX: number; bottomY: number; name: string }[] = [];
 
     onLoad() {
+        GameAudio.preloadSfx(this.coinSfxPath);
         this.scheduleOnce(() => this.rebuild(), 0);
     }
 
@@ -159,6 +173,7 @@ export default class CoinSpawner extends cc.Component {
         }
 
         cc.systemEvent.emit('coin-collected');
+        GameAudio.playSfxWithEngineVolume(this.coinSfxPath, this.getCoinSfxEngineVolume());
         this.playCollectEffect(coinNode.getPosition());
         this.removeCoinSprite(coinNode.getComponent(cc.Sprite));
         coinNode.destroy();
@@ -267,6 +282,19 @@ export default class CoinSpawner extends cc.Component {
         if (index !== -1) {
             this.coinSprites.splice(index, 1);
         }
+    }
+
+    private getCoinSfxEngineVolume() {
+        if (typeof this.coinSfxEngineVolume === 'number' && !isNaN(this.coinSfxEngineVolume) && this.coinSfxEngineVolume > 0) {
+            return Math.max(0, Math.min(1, this.coinSfxEngineVolume));
+        }
+
+        const volume = typeof this.sfxVolume === 'number' && !isNaN(this.sfxVolume) ? this.sfxVolume : 100;
+        const boost = typeof this.coinSfxBoost === 'number' && !isNaN(this.coinSfxBoost) && this.coinSfxBoost > 0
+            ? this.coinSfxBoost
+            : 1.5;
+
+        return Math.max(0, Math.min(1, 0.1 * volume * boost / 100));
     }
 
     private getOrCreateRoot() {

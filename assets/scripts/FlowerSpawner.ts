@@ -50,10 +50,10 @@ export default class FlowerSpawner extends cc.Component {
     colliderWidth: number = 12;
 
     @property
-    colliderHeight: number = 24;
+    colliderHeight: number = 18;
 
     @property
-    colliderOffsetY: number = 14;
+    colliderOffsetY: number = 11;
 
     @property
     hiddenOffsetY: number = 2;

@@ -99,6 +99,12 @@ export default class GoombaSpawner extends cc.Component {
     @property
     zIndex: number = 2000;
 
+    @property
+    stompSfxPath: string = 'audio/stomp';
+
+    @property
+    sfxVolume: number = 100;
+
     private readonly generatedRootName = '__Goombas';
     private readonly gidMask = 0x1fffffff;
 
@@ -203,7 +209,9 @@ export default class GoombaSpawner extends cc.Component {
                 this.flyDuration,
                 this.flyRise,
                 this.scoreValue,
-                this.coinColliderTag
+                this.coinColliderTag,
+                this.stompSfxPath,
+                this.sfxVolume
             );
         }
 
