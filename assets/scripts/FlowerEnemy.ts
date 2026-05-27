@@ -1,3 +1,5 @@
+import GamePause from './GamePause';
+
 const { ccclass } = cc._decorator;
 
 type FlowerState = 'hidden' | 'playing' | 'cooldown';
@@ -60,6 +62,10 @@ export default class FlowerEnemy extends cc.Component {
     }
 
     update(dt: number) {
+        if (GamePause.paused) {
+            return;
+        }
+
         this.updateMouthAnimation(dt);
 
         if (this.state === 'cooldown') {

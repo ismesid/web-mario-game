@@ -258,10 +258,35 @@ export default class SceneChanger extends cc.Component {
         SceneChanger.playBgmForScene(scene ? scene.name : '');
     }
 
-    private static playBgmForScene(sceneName: string, overridePath: string = '') {
+    public static playBgmForScene(sceneName: string, overridePath: string = '') {
         const bgmPath = overridePath || (sceneName === SceneChanger.gameSceneName
             ? SceneChanger.gameBgmPath
             : SceneChanger.defaultBgmPath);
+        SceneChanger.playBgm(bgmPath);
+    }
+
+    public static playBgmForCurrentScene() {
+        const scene = cc.director.getScene();
+        const sceneName = scene ? scene.name : '';
+        const bgmPath = sceneName === SceneChanger.gameSceneName
+            ? SceneChanger.gameBgmPath
+            : SceneChanger.defaultBgmPath;
+        SceneChanger.playBgm(bgmPath, true);
+    }
+
+    public static resumeBgmForCurrentScene() {
+        const scene = cc.director.getScene();
+        const sceneName = scene ? scene.name : '';
+        const bgmPath = sceneName === SceneChanger.gameSceneName
+            ? SceneChanger.gameBgmPath
+            : SceneChanger.defaultBgmPath;
+
+        if (SceneChanger.currentBgmPath === bgmPath && SceneChanger.currentBgmClip) {
+            cc.audioEngine.resumeMusic();
+            cc.audioEngine.setMusicVolume(SceneChanger.getEngineBgmVolume());
+            return;
+        }
+
         SceneChanger.playBgm(bgmPath);
     }
 
@@ -318,9 +343,14 @@ export default class SceneChanger extends cc.Component {
         cc.audioEngine.setMusicVolume(SceneChanger.getEngineBgmVolume());
     }
 
-    private static stopBgm() {
+    public static stopBgm() {
         SceneChanger.loadingBgmPath = '';
         cc.audioEngine.stopMusic();
+    }
+
+    public static pauseBgm() {
+        SceneChanger.loadingBgmPath = '';
+        cc.audioEngine.pauseMusic();
     }
 
     private static getEngineBgmVolume() {

@@ -1,3 +1,5 @@
+import GamePause from './GamePause';
+
 const { ccclass, property } = cc._decorator;
 
 @ccclass
@@ -63,6 +65,10 @@ export default class CameraFollow extends cc.Component {
 
     lateUpdate(dt: number) {
         this.applyCameraZoom();
+
+        if (GamePause.paused) {
+            return;
+        }
 
         const nextPosition = this.getNextCameraPosition(true);
         if (!nextPosition) {

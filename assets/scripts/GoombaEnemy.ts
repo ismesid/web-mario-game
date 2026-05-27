@@ -1,5 +1,6 @@
 import PlayerController from './PlayerController';
 import GameAudio from './GameAudio';
+import GamePause from './GamePause';
 
 const { ccclass } = cc._decorator;
 
@@ -100,6 +101,11 @@ export default class GoombaEnemy extends cc.Component {
     }
 
     update(dt: number) {
+        if (GamePause.paused) {
+            this.stopMoving();
+            return;
+        }
+
         if (this.state === 'defeated') {
             this.updateAngelAnimation(dt);
             return;

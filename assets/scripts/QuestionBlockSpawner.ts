@@ -1,6 +1,7 @@
 import QuestionBlock from './QuestionBlock';
 import CoinSpawner from './CoinSpawner';
 import GameAudio from './GameAudio';
+import GamePause from './GamePause';
 
 const { ccclass, property } = cc._decorator;
 
@@ -69,6 +70,10 @@ export default class QuestionBlockSpawner extends cc.Component {
     }
 
     update(dt: number) {
+        if (GamePause.paused) {
+            return;
+        }
+
         if (this.questionFrames.length === 0 || this.activeSprites.length === 0) {
             return;
         }

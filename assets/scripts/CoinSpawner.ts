@@ -1,5 +1,6 @@
 import CoinCollectible from './CoinCollectible';
 import GameAudio from './GameAudio';
+import GamePause from './GamePause';
 
 const { ccclass, property } = cc._decorator;
 
@@ -66,6 +67,10 @@ export default class CoinSpawner extends cc.Component {
     }
 
     update(dt: number) {
+        if (GamePause.paused) {
+            return;
+        }
+
         if (this.frames.length === 0 || this.coinSprites.length === 0) {
             return;
         }

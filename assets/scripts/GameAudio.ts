@@ -16,6 +16,37 @@ export default class GameAudio extends cc.Component {
         GameAudio.loadSfx(path);
     }
 
+    public static getSfxDuration(path: string, fallbackDuration: number, callback: (duration: number) => void) {
+        const safeFallback = typeof fallbackDuration === 'number' && !isNaN(fallbackDuration) && fallbackDuration > 0
+            ? fallbackDuration
+            : 0.1;
+
+        if (!path) {
+            callback(safeFallback);
+            return;
+        }
+
+        const cachedClip = GameAudio.clipCache[path];
+        if (cachedClip) {
+            callback(GameAudio.getClipDuration(cachedClip, safeFallback));
+            return;
+        }
+
+        if (GameAudio.pendingCallbacks[path]) {
+            GameAudio.pendingCallbacks[path].push((clip: cc.AudioClip) => {
+                callback(GameAudio.getClipDuration(clip, safeFallback));
+            });
+            return;
+        }
+
+        GameAudio.pendingCallbacks[path] = [
+            (clip: cc.AudioClip) => {
+                callback(GameAudio.getClipDuration(clip, safeFallback));
+            }
+        ];
+        GameAudio.loadSfx(path);
+    }
+
     public static playSfx(path: string, volume: number = 100) {
         if (!path) {
             return;
@@ -74,6 +105,11 @@ export default class GameAudio extends cc.Component {
 
     private static playClip(clip: cc.AudioClip, volume: number) {
         cc.audioEngine.play(clip, false, volume);
+    }
+
+    private static getClipDuration(clip: cc.AudioClip, fallbackDuration: number) {
+        const duration = clip && typeof clip.duration === 'number' ? clip.duration : fallbackDuration;
+        return duration > 0 ? duration : fallbackDuration;
     }
 
     private static toEngineVolume(volume: number) {

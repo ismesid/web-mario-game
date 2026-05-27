@@ -1,4 +1,5 @@
 import GameAudio from './GameAudio';
+import GamePause from './GamePause';
 
 const { ccclass, property } = cc._decorator;
 
@@ -94,6 +95,54 @@ export default class PlayerController extends cc.Component {
     @property
     climbSfxInterval: number = 0.25;
 
+    @property
+    loseOneLifeSfxPath: string = 'audio/loseOneLife';
+
+    @property
+    defeatSfxVolume: number = 100;
+
+    @property
+    defeatRise: number = 140;
+
+    @property
+    defeatDuration: number = 2.238;
+
+    @property
+    defeatRiseDuration: number = 0.45;
+
+    @property
+    respawnGroundProbeUp: number = 48;
+
+    @property
+    respawnGroundProbeDown: number = 220;
+
+    @property
+    respawnGroundOffset: number = 0.5;
+
+    @property
+    respawnIdleLockDuration: number = 0.25;
+
+    @property
+    victoryFrameDuration: number = 1;
+
+    @property
+    finishDoorTileX: number = 233;
+
+    @property
+    finishDoorTileY: number = 35;
+
+    @property
+    finishDoorTileHeight: number = 2;
+
+    @property
+    finishDoorLeftOffset: number = 16;
+
+    @property
+    finishDoorTriggerWidth: number = 16;
+
+    @property
+    finishDoorMaxPlayerY: number = 160;
+
     private body: cc.RigidBody = null;
     private movingLeft = false;
     private movingRight = false;
@@ -120,23 +169,33 @@ export default class PlayerController extends cc.Component {
     private climbSfxTimer = 0;
     private spawnPosition: cc.Vec2 = null;
     private defaultGravityScale = 1;
+    private isDefeatSequence = false;
+    private isVictorySequence = false;
+    private holdingDefeatPosition = false;
+    private defeatHoldPosition: cc.Vec2 = null;
+    private respawnIdleLockTimer = 0;
+    private finishDoorTriggerRect: { left: number; right: number; bottom: number; top: number } = null;
     private readonly groundCheckTolerance = 8;
     private readonly groundContactNormalY = -0.35;
     private readonly climbThroughNormalY = 0.35;
     private readonly climbExitClearance = 2;
     private readonly damageTint = cc.color(255, 32, 32);
     private readonly damageBlinkOpacity = 35;
+    private readonly groundRayNormalY = 0.5;
 
     private readonly idleFrames = ['idle_0.png'];
     private readonly walkFrames = ['walk_0.png', 'walk_1.png', 'walk_2.png', 'walk_3.png'];
     private readonly jumpForwardFrames = ['jump_forward_0.png', 'jump_forward_1.png', 'jump_forward_2.png', 'jump_forward_3.png'];
     private readonly jumpUpFrames = ['jump_up_0.png', 'jump_up_1.png', 'jump_up_2.png', 'jump_up_3.png'];
     private readonly climbFrames = ['climb_0.png', 'climb_1.png', 'climb_2.png'];
+    private readonly defeatFrames = ['defeat_0.png', 'defeat_1.png', 'defeat_2.png'];
+    private readonly victoryFrames = ['victory_0.png', 'victory_1.png'];
 
     onLoad() {
         this.setupPhysics();
         this.loadMarioFrames();
         this.spawnPosition = this.getSpawnPositionFromTileMap() || cc.v2(this.node.x, this.node.y);
+        this.finishDoorTriggerRect = this.getFinishDoorTriggerRectFromTileMap();
         this.ensurePlayerRendersAboveMap();
         this.configureSpriteSize();
         this.node.opacity = 255;
@@ -161,8 +220,11 @@ export default class PlayerController extends cc.Component {
 
         cc.systemEvent.on('level-intro-start', this.lockPlayer, this);
         cc.systemEvent.on('level-ready', this.onLevelReady, this);
+        cc.systemEvent.on('player-out-of-lives', this.playDefeatSequence, this);
+        cc.systemEvent.on('player-continue', this.onPlayerContinue, this);
         cc.systemEvent.on(cc.SystemEvent.EventType.KEY_DOWN, this.onKeyDown, this);
         cc.systemEvent.on(cc.SystemEvent.EventType.KEY_UP, this.onKeyUp, this);
+        GameAudio.preloadSfx(this.loseOneLifeSfxPath);
 
         if (this.autoStartDelay >= 0) {
             this.scheduleOnce(() => {
@@ -176,6 +238,8 @@ export default class PlayerController extends cc.Component {
     onDestroy() {
         cc.systemEvent.off('level-intro-start', this.lockPlayer, this);
         cc.systemEvent.off('level-ready', this.onLevelReady, this);
+        cc.systemEvent.off('player-out-of-lives', this.playDefeatSequence, this);
+        cc.systemEvent.off('player-continue', this.onPlayerContinue, this);
         cc.systemEvent.off(cc.SystemEvent.EventType.KEY_DOWN, this.onKeyDown, this);
         cc.systemEvent.off(cc.SystemEvent.EventType.KEY_UP, this.onKeyUp, this);
     }
@@ -184,12 +248,28 @@ export default class PlayerController extends cc.Component {
         const dt = cc.director.getDeltaTime();
         this.updateDamageInvincibility(dt);
 
+        if (this.isDefeatSequence) {
+            this.holdDefeatPosition();
+            return;
+        }
+
+        if (this.isVictorySequence) {
+            return;
+        }
+
+        if (GamePause.paused) {
+            return;
+        }
+
         if (!this.body || !this.isLevelReady) {
             return;
         }
 
         if (this.jumpAnimationTimer > 0) {
             this.jumpAnimationTimer = Math.max(0, this.jumpAnimationTimer - dt);
+        }
+        if (this.respawnIdleLockTimer > 0) {
+            this.respawnIdleLockTimer = Math.max(0, this.respawnIdleLockTimer - dt);
         }
 
         if (this.shouldForwardJumpFromUpInput() || this.shouldJumpFromVineTop()) {
@@ -201,11 +281,13 @@ export default class PlayerController extends cc.Component {
         if (this.isClimbing) {
             this.updateClimbing(dt);
             this.enforceMapBoundary();
+            this.checkFinishReached();
             return;
         }
 
         this.updateNormalMovement();
         this.enforceMapBoundary();
+        this.checkFinishReached();
     }
 
     private updateNormalMovement() {
@@ -385,8 +467,13 @@ export default class PlayerController extends cc.Component {
     }
 
     private onLevelReady() {
+        this.isDefeatSequence = false;
+        this.isVictorySequence = false;
+        this.holdingDefeatPosition = false;
+        this.defeatHoldPosition = null;
         this.isLevelReady = true;
-        this.node.setPosition(this.spawnPosition);
+        this.node.stopAllActions();
+        this.node.setPosition(this.getRespawnPositionOnGround());
         this.stopDamageInvincibility(255);
         this.node.opacity = 255;
         this.node.color = cc.Color.WHITE;
@@ -401,6 +488,9 @@ export default class PlayerController extends cc.Component {
             this.body.angularVelocity = 0;
             this.body.syncPosition(true);
         }
+        this.setPlayerColliderEnabled(true);
+        this.resetToIdleFrame();
+        this.respawnIdleLockTimer = this.respawnIdleLockDuration;
     }
 
     private setupPhysics() {
@@ -602,6 +692,11 @@ export default class PlayerController extends cc.Component {
             return;
         }
 
+        if (this.respawnIdleLockTimer > 0 && !this.hasHorizontalInput() && Math.abs(velocityX) < 1) {
+            this.setAnimationFrame('idle', this.idleFrames, 1, false);
+            return;
+        }
+
         const airborne = !this.isGrounded();
         if (airborne) {
             if (this.jumpStartedWithForwardSpeed) {
@@ -664,6 +759,10 @@ export default class PlayerController extends cc.Component {
     }
 
     onBeginContact(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
+        if (GamePause.paused || this.isDefeatSequence || this.isVictorySequence) {
+            return;
+        }
+
         if (this.isHazardTerrainCollider(otherCollider)) {
             return;
         }
@@ -688,6 +787,11 @@ export default class PlayerController extends cc.Component {
     }
 
     onPreSolve(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
+        if (GamePause.paused || this.isDefeatSequence || this.isVictorySequence) {
+            contact.disabledOnce = true;
+            return;
+        }
+
         if (this.isHazardTerrainCollider(otherCollider)) {
             this.refreshHazardGroundContact(contact, selfCollider, otherCollider);
             if (!this.isStandingOnSafeGround(selfCollider)) {
@@ -724,6 +828,10 @@ export default class PlayerController extends cc.Component {
     }
 
     onEndContact(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
+        if (GamePause.paused || this.isDefeatSequence || this.isVictorySequence) {
+            return;
+        }
+
         if (this.isHazardTerrainCollider(otherCollider)) {
             this.removeCollider(this.groundColliders, otherCollider);
             return;
@@ -751,6 +859,10 @@ export default class PlayerController extends cc.Component {
     }
 
     private onKeyDown(event: cc.Event.EventKeyboard) {
+        if (GamePause.paused || this.isDefeatSequence || this.isVictorySequence) {
+            return;
+        }
+
         switch (event.keyCode) {
             case cc.macro.KEY.a:
             case cc.macro.KEY.left:
@@ -889,12 +1001,321 @@ export default class PlayerController extends cc.Component {
     }
 
     private takeDamage() {
-        if (this.isDamageInvincible) {
+        if (this.isDamageInvincible || GamePause.paused || this.isDefeatSequence || this.isVictorySequence) {
             return;
         }
 
         cc.systemEvent.emit('player-damaged');
+        if (this.isDefeatSequence || this.isVictorySequence || GamePause.paused) {
+            return;
+        }
+
         this.startDamageInvincibility();
+    }
+
+    private playDefeatSequence() {
+        if (this.isDefeatSequence || this.isVictorySequence) {
+            return;
+        }
+
+        this.isDefeatSequence = true;
+        this.holdingDefeatPosition = false;
+        this.defeatHoldPosition = null;
+        this.isLevelReady = false;
+        this.clearInputState();
+        this.stopDamageInvincibility(255);
+        this.stopClimbing(false);
+        this.groundColliders = [];
+        this.vineColliders = [];
+        this.climbPassThroughColliders = [];
+        this.node.opacity = 255;
+        this.node.color = cc.Color.WHITE;
+        this.node.stopAllActions();
+        this.setMarioFrame(this.defeatFrames[0]);
+
+        if (this.body) {
+            this.body.gravityScale = 0;
+            this.body.linearVelocity = cc.v2(0, 0);
+            this.body.angularVelocity = 0;
+            this.body.enabled = false;
+        }
+        this.setPlayerColliderEnabled(false);
+
+        const targetPosition = this.getDefeatTargetPosition();
+        const duration = Math.max(0.1, this.defeatRiseDuration);
+        this.node.runAction(cc.sequence(
+            cc.moveTo(duration, targetPosition).easing(cc.easeSineOut()),
+            cc.callFunc(() => {
+                this.startHoldingDefeatPosition(targetPosition);
+                this.playDefeatAudioAnimation();
+            })
+        ));
+    }
+
+    private onPlayerContinue() {
+        this.isDefeatSequence = false;
+        this.holdingDefeatPosition = false;
+        this.defeatHoldPosition = null;
+        this.clearInputState();
+        this.onLevelReady();
+    }
+
+    private checkFinishReached() {
+        if (this.isVictorySequence || this.isDefeatSequence) {
+            return;
+        }
+
+        const collider = this.getComponent(cc.PhysicsBoxCollider);
+        if (!collider) {
+            return;
+        }
+
+        const playerRect = this.getWorldRect(collider);
+        if (this.isInsideFinishDoorTrigger(playerRect)) {
+            this.playVictorySequence();
+        }
+    }
+
+    private isInsideFinishDoorTrigger(playerRect: any) {
+        return !!this.finishDoorTriggerRect
+            && playerRect.left <= this.finishDoorTriggerRect.right
+            && playerRect.right >= this.finishDoorTriggerRect.left
+            && playerRect.bottom <= this.finishDoorTriggerRect.top
+            && playerRect.top >= this.finishDoorTriggerRect.bottom;
+    }
+
+    private playVictorySequence() {
+        if (this.isVictorySequence || this.isDefeatSequence) {
+            return;
+        }
+
+        this.isVictorySequence = true;
+        this.isLevelReady = false;
+        this.clearInputState();
+        this.stopDamageInvincibility(255);
+        this.stopClimbing(false);
+        this.groundColliders = [];
+        this.vineColliders = [];
+        this.climbPassThroughColliders = [];
+        this.node.stopAllActions();
+        this.node.opacity = 255;
+        this.node.color = cc.Color.WHITE;
+        this.setPlayerColliderEnabled(false);
+
+        if (this.body) {
+            this.body.gravityScale = 0;
+            this.body.linearVelocity = cc.v2(0, 0);
+            this.body.angularVelocity = 0;
+            this.body.enabled = false;
+        }
+
+        GamePause.pause();
+        this.node.runAction(cc.sequence(
+            this.createEvenFrameAction(this.victoryFrames, this.victoryFrames.length * Math.max(0.1, this.victoryFrameDuration)),
+            cc.callFunc(() => {
+                cc.systemEvent.emit('player-victory-finished');
+            })
+        ));
+    }
+
+    private clearInputState() {
+        this.movingLeft = false;
+        this.movingRight = false;
+        this.movingUp = false;
+        this.movingDown = false;
+        this.jumpHeld = false;
+        this.jumpQueued = false;
+        this.jumpAnimationTimer = 0;
+        this.jumpStartedWithForwardSpeed = false;
+        this.groundRunTime = 0;
+        this.climbSfxTimer = 0;
+    }
+
+    private getDefeatTargetPosition() {
+        const currentWorld = this.node.convertToWorldSpaceAR(cc.v2(0, 0));
+        const bounds = this.getMapWorldBounds();
+        let targetWorldY = currentWorld.y + this.defeatRise;
+
+        if (bounds) {
+            targetWorldY = Math.min(targetWorldY, bounds.top - this.colliderHeight * 0.5 - 2);
+        }
+
+        targetWorldY = Math.max(currentWorld.y, targetWorldY);
+        const targetWorld = cc.v2(currentWorld.x, targetWorldY);
+        return this.node.parent ? this.node.parent.convertToNodeSpaceAR(targetWorld) : targetWorld;
+    }
+
+    private getRespawnPositionOnGround() {
+        if (!this.spawnPosition) {
+            return this.node.getPosition();
+        }
+
+        const snappedPosition = this.findGroundedPosition(this.spawnPosition);
+        return snappedPosition || this.spawnPosition;
+    }
+
+    private findGroundedPosition(localPosition: cc.Vec2) {
+        if (!this.node.parent) {
+            return null;
+        }
+
+        const localStart = cc.v2(localPosition.x, localPosition.y + Math.max(0, this.respawnGroundProbeUp));
+        const localEnd = cc.v2(localPosition.x, localPosition.y - Math.max(1, this.respawnGroundProbeDown));
+        const worldStart = this.node.parent.convertToWorldSpaceAR(localStart);
+        const worldEnd = this.node.parent.convertToWorldSpaceAR(localEnd);
+        const results = cc.director.getPhysicsManager().rayCast(worldStart, worldEnd, cc.RayCastType.All);
+        if (!results || results.length === 0) {
+            return null;
+        }
+
+        let bestPoint: cc.Vec2 = null;
+        let bestFraction = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < results.length; i++) {
+            const result = results[i];
+            if (!this.isRespawnGroundResult(result)) {
+                continue;
+            }
+
+            if (result.fraction < bestFraction) {
+                bestFraction = result.fraction;
+                bestPoint = result.point;
+            }
+        }
+
+        if (!bestPoint) {
+            return null;
+        }
+
+        const collider = this.getComponent(cc.PhysicsBoxCollider);
+        const offset = collider ? collider.offset || cc.v2(0, 0) : cc.v2(0, 0);
+        const size = collider ? collider.size || cc.size(this.colliderWidth, this.colliderHeight) : cc.size(this.colliderWidth, this.colliderHeight);
+        const targetWorld = cc.v2(
+            worldStart.x,
+            bestPoint.y + size.height * 0.5 - offset.y + this.respawnGroundOffset
+        );
+        return this.node.parent.convertToNodeSpaceAR(targetWorld);
+    }
+
+    private getFinishDoorTriggerRectFromTileMap() {
+        const mapNode = cc.find(this.boundsMapNodePath) || cc.find(this.mapNodePath);
+        if (!mapNode) {
+            return null;
+        }
+
+        const tileMap = mapNode.getComponent(cc.TiledMap);
+        if (!tileMap) {
+            return null;
+        }
+
+        const mapSize = tileMap.getMapSize();
+        const tileSize = tileMap.getTileSize();
+        const mapWidth = mapSize.width * tileSize.width;
+        const mapHeight = mapSize.height * tileSize.height;
+        const doorLeftRawX = Math.max(0, this.finishDoorTileX) * tileSize.width;
+        const triggerLeftRawX = doorLeftRawX - Math.max(0, this.finishDoorLeftOffset);
+        const triggerRightRawX = triggerLeftRawX + Math.max(1, this.finishDoorTriggerWidth);
+        const doorBottomRawY = (mapSize.height - Math.max(0, this.finishDoorTileY + this.finishDoorTileHeight)) * tileSize.height;
+        const triggerBottomRawY = Math.max(0, doorBottomRawY - tileSize.height);
+        const triggerTopRawY = Math.max(triggerBottomRawY + 1, this.finishDoorMaxPlayerY);
+        const left = triggerLeftRawX - mapWidth * mapNode.anchorX;
+        const right = triggerRightRawX - mapWidth * mapNode.anchorX;
+        const bottom = triggerBottomRawY - mapHeight * mapNode.anchorY;
+        const top = triggerTopRawY - mapHeight * mapNode.anchorY;
+        const bottomLeft = mapNode.convertToWorldSpaceAR(cc.v2(left, bottom));
+        const topRight = mapNode.convertToWorldSpaceAR(cc.v2(right, top));
+
+        return {
+            left: Math.min(bottomLeft.x, topRight.x),
+            right: Math.max(bottomLeft.x, topRight.x),
+            bottom: Math.min(bottomLeft.y, topRight.y),
+            top: Math.max(bottomLeft.y, topRight.y)
+        };
+    }
+
+    private isRespawnGroundResult(result: cc.PhysicsRayCastResult) {
+        if (!result || !result.collider || !result.collider.node || result.collider.node === this.node) {
+            return false;
+        }
+
+        const collider: any = result.collider;
+        if (collider.sensor || collider.tag !== 0) {
+            return false;
+        }
+
+        return result.normal && result.normal.y >= this.groundRayNormalY;
+    }
+
+    private resetToIdleFrame() {
+        this.currentAnimationKey = '';
+        this.animationTimer = 0;
+        this.jumpAnimationTimer = 0;
+        this.jumpStartedWithForwardSpeed = false;
+        this.groundRunTime = 0;
+        this.setAnimationFrame('idle', this.idleFrames, 1, false);
+    }
+
+    private startHoldingDefeatPosition(position: cc.Vec2) {
+        this.defeatHoldPosition = cc.v2(position.x, position.y);
+        this.holdingDefeatPosition = true;
+        this.holdDefeatPosition();
+    }
+
+    private holdDefeatPosition() {
+        if (!this.holdingDefeatPosition || !this.defeatHoldPosition) {
+            return;
+        }
+
+        this.node.setPosition(this.defeatHoldPosition);
+        if (this.body) {
+            this.body.gravityScale = 0;
+            this.body.linearVelocity = cc.v2(0, 0);
+            this.body.angularVelocity = 0;
+            this.body.enabled = false;
+        }
+    }
+
+    private playDefeatAudioAnimation() {
+        GameAudio.getSfxDuration(this.loseOneLifeSfxPath, this.defeatDuration, (duration: number) => {
+            if (!cc.isValid(this.node) || !this.isDefeatSequence) {
+                return;
+            }
+
+            const safeDuration = Math.max(0.1, duration);
+            GameAudio.playSfx(this.loseOneLifeSfxPath, this.defeatSfxVolume);
+            this.node.stopAllActions();
+            this.node.runAction(cc.sequence(
+                this.createEvenFrameAction(this.defeatFrames, safeDuration),
+                cc.callFunc(() => {
+                    cc.systemEvent.emit('player-defeat-finished');
+                })
+            ));
+        });
+    }
+
+    private createEvenFrameAction(frames: string[], duration: number) {
+        const safeFrames = frames && frames.length > 0 ? frames : this.defeatFrames;
+        const frameDuration = Math.max(0.05, duration / safeFrames.length);
+        const actions: cc.FiniteTimeAction[] = [];
+
+        for (let i = 0; i < safeFrames.length; i++) {
+            const frameName = safeFrames[i];
+            actions.push(cc.callFunc(() => {
+                this.setMarioFrame(frameName);
+            }));
+            actions.push(cc.delayTime(frameDuration));
+        }
+
+        return cc.sequence(actions);
+    }
+
+    private setPlayerColliderEnabled(enabled: boolean) {
+        const collider = this.getComponent(cc.PhysicsBoxCollider);
+        if (!collider) {
+            return;
+        }
+
+        collider.enabled = enabled;
+        collider.apply();
     }
 
     private startDamageInvincibility() {
@@ -914,7 +1335,7 @@ export default class PlayerController extends cc.Component {
     }
 
     private updateDamageInvincibility(dt: number) {
-        if (!this.isDamageInvincible) {
+        if (!this.isDamageInvincible || this.isDefeatSequence) {
             return;
         }
 
