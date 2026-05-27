@@ -14,6 +14,24 @@ export default class TileMapCollisionBuilder extends cc.Component {
     vineLayerNames: string = 'vines';
 
     @property
+    hazardLayerNames: string = 'die';
+
+    @property
+    safeHazardCoverLayerNames: string = '*';
+
+    @property
+    shrinkColliderLayerNames: string = 'die2';
+
+    @property
+    shrinkColliderInsetX: number = 3;
+
+    @property
+    lowerColliderTopLayerNames: string = 'die';
+
+    @property
+    lowerColliderTopY: number = 8;
+
+    @property
     enableTopOnlyLayers: boolean = false;
 
     @property
@@ -24,6 +42,9 @@ export default class TileMapCollisionBuilder extends cc.Component {
 
     @property
     vineColliderTag: number = 1001;
+
+    @property
+    hazardColliderTag: number = 4001;
 
     @property
     vineSensorExtraHeight: number = 16;
@@ -70,6 +91,10 @@ export default class TileMapCollisionBuilder extends cc.Component {
 
         const ignoredNames = this.parseNameList(this.ignoredLayerNames);
         const vineNames = this.parseNameList(this.vineLayerNames);
+        const hazardNames = this.parseNameList(this.hazardLayerNames);
+        const safeHazardCoverNames = this.parseNameList(this.safeHazardCoverLayerNames);
+        const shrinkColliderNames = this.parseNameList(this.shrinkColliderLayerNames);
+        const lowerTopNames = this.parseNameList(this.lowerColliderTopLayerNames);
         const topOnlyNames = this.enableTopOnlyLayers ? this.parseNameList(this.topOnlyLayerNames) : [];
         const solidNames = this.parseNameList(this.solidLayerNames);
         const useAllSolidLayers = solidNames.length === 0 || solidNames[0] === '*';
@@ -87,7 +112,31 @@ export default class TileMapCollisionBuilder extends cc.Component {
             }
 
             if (this.containsName(vineNames, layerName)) {
-                this.buildLayerColliders(tileMap, layer, root, true, false, this.vineColliderTag);
+                this.buildLayerColliders(tileMap, layer, root, true, false, this.vineColliderTag, null, 0);
+                continue;
+            }
+
+            if (this.containsName(hazardNames, layerName)) {
+                this.buildLayerColliders(
+                    tileMap,
+                    layer,
+                    root,
+                    false,
+                    false,
+                    this.hazardColliderTag,
+                    (tileX: number, tileY: number) => this.isCoveredBySafeHazardLayer(
+                        layers,
+                        tileX,
+                        tileY,
+                        ignoredNames,
+                        vineNames,
+                        hazardNames,
+                        safeHazardCoverNames
+                    )
+                    ,
+                    this.getShrinkInsetForLayer(shrinkColliderNames, layerName),
+                    this.getLowerTopForLayer(lowerTopNames, layerName)
+                );
                 continue;
             }
 
@@ -98,7 +147,10 @@ export default class TileMapCollisionBuilder extends cc.Component {
                     root,
                     false,
                     this.enableTopOnlyLayers && this.containsName(topOnlyNames, layerName),
-                    this.solidColliderTag
+                    this.solidColliderTag,
+                    null,
+                    this.getShrinkInsetForLayer(shrinkColliderNames, layerName),
+                    this.getLowerTopForLayer(lowerTopNames, layerName)
                 );
             }
         }
@@ -114,7 +166,10 @@ export default class TileMapCollisionBuilder extends cc.Component {
         root: cc.Node,
         isSensor: boolean,
         isTopOnly: boolean,
-        tag: number
+        tag: number,
+        shouldSkipTile?: (tileX: number, tileY: number) => boolean,
+        shrinkInsetX: number = 0,
+        lowerTopY: number = 0
     ) {
         const layerSize = layer.getLayerSize();
         const tileSize = tileMap.getTileSize();
@@ -130,25 +185,25 @@ export default class TileMapCollisionBuilder extends cc.Component {
 
             while (x < layerSize.width) {
                 const rawGid = layer.getTileGIDAt(x, y);
-                if (rawGid === 0) {
+                if (rawGid === 0 || (shouldSkipTile && shouldSkipTile(x, y))) {
                     x++;
                     continue;
                 }
 
-                const bounds = this.getTileBounds(rawGid, tileSize, isSensor, isTopOnly);
+                const bounds = this.getTileBounds(rawGid, tileSize, isSensor, isTopOnly, shrinkInsetX, lowerTopY);
                 if (!bounds) {
                     x++;
                     continue;
                 }
 
                 let runLength = 1;
-                while (x + runLength < layerSize.width) {
+                while (shrinkInsetX <= 0 && x + runLength < layerSize.width) {
                     const nextRawGid = layer.getTileGIDAt(x + runLength, y);
-                    if (nextRawGid === 0) {
+                    if (nextRawGid === 0 || (shouldSkipTile && shouldSkipTile(x + runLength, y))) {
                         break;
                     }
 
-                    const nextBounds = this.getTileBounds(nextRawGid, tileSize, isSensor, isTopOnly);
+                    const nextBounds = this.getTileBounds(nextRawGid, tileSize, isSensor, isTopOnly, shrinkInsetX, lowerTopY);
                     if (!nextBounds || !this.sameBounds(bounds, nextBounds)) {
                         break;
                     }
@@ -226,7 +281,9 @@ export default class TileMapCollisionBuilder extends cc.Component {
         rawGid: number,
         tileSize: cc.Size,
         isSensor: boolean,
-        isTopOnly: boolean
+        isTopOnly: boolean,
+        shrinkInsetX: number = 0,
+        lowerTopY: number = 0
     ): [number, number, number, number] | null {
         const unsignedGid = rawGid >>> 0;
         const cleanGid = rawGid & this.gidMask;
@@ -258,6 +315,18 @@ export default class TileMapCollisionBuilder extends cc.Component {
 
         if (isTopOnly) {
             height = Math.min(height, this.topOnlyColliderHeight);
+        }
+
+        if (shrinkInsetX > 0 && !isSensor) {
+            const inset = Math.min(shrinkInsetX, width * 0.5);
+            x += inset;
+            width -= inset * 2;
+        }
+
+        if (lowerTopY > 0 && !isSensor) {
+            const inset = Math.min(lowerTopY, height);
+            y += inset;
+            height -= inset;
         }
 
         if (width <= 0 || height <= 0) {
@@ -468,5 +537,59 @@ export default class TileMapCollisionBuilder extends cc.Component {
     private containsName(names: string[], target: string) {
         const normalizedTarget = target.toLowerCase();
         return names.some(name => name.toLowerCase() === normalizedTarget);
+    }
+
+    private getShrinkInsetForLayer(names: string[], layerName: string) {
+        if (!this.containsName(names, layerName)) {
+            return 0;
+        }
+
+        return Math.max(0, this.shrinkColliderInsetX);
+    }
+
+    private getLowerTopForLayer(names: string[], layerName: string) {
+        if (!this.containsName(names, layerName)) {
+            return 0;
+        }
+
+        return Math.max(0, this.lowerColliderTopY);
+    }
+
+    private isCoveredBySafeHazardLayer(
+        layers: cc.TiledLayer[],
+        tileX: number,
+        tileY: number,
+        ignoredNames: string[],
+        vineNames: string[],
+        hazardNames: string[],
+        safeCoverNames: string[]
+    ) {
+        const useAllSafeLayers = safeCoverNames.length === 0 || safeCoverNames[0] === '*';
+
+        for (let i = 0; i < layers.length; i++) {
+            const layer = layers[i];
+            if (!layer || !layer.node || !layer.node.active) {
+                continue;
+            }
+
+            const layerName = layer.node.name;
+            if (
+                this.containsName(ignoredNames, layerName)
+                || this.containsName(vineNames, layerName)
+                || this.containsName(hazardNames, layerName)
+            ) {
+                continue;
+            }
+
+            if (!useAllSafeLayers && !this.containsName(safeCoverNames, layerName)) {
+                continue;
+            }
+
+            if ((layer.getTileGIDAt(tileX, tileY) & this.gidMask) !== 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

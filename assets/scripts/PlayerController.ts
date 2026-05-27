@@ -42,6 +42,9 @@ export default class PlayerController extends cc.Component {
     goombaEnemyColliderTag: number = 3002;
 
     @property
+    hazardTerrainColliderTag: number = 4001;
+
+    @property
     damageInvincibleDuration: number = 2;
 
     @property
@@ -106,6 +109,8 @@ export default class PlayerController extends cc.Component {
     private readonly groundContactNormalY = -0.35;
     private readonly climbThroughNormalY = 0.35;
     private readonly climbExitClearance = 2;
+    private readonly damageTint = cc.color(255, 32, 32);
+    private readonly damageBlinkOpacity = 35;
 
     private readonly idleFrames = ['idle_0.png'];
     private readonly walkFrames = ['walk_0.png', 'walk_1.png', 'walk_2.png', 'walk_3.png'];
@@ -346,6 +351,7 @@ export default class PlayerController extends cc.Component {
         this.node.setPosition(this.spawnPosition);
         this.stopDamageInvincibility(0);
         this.node.opacity = 0;
+        this.node.color = cc.Color.WHITE;
         this.groundColliders = [];
         this.vineColliders = [];
         this.climbPassThroughColliders = [];
@@ -364,6 +370,7 @@ export default class PlayerController extends cc.Component {
         this.node.setPosition(this.spawnPosition);
         this.stopDamageInvincibility(255);
         this.node.opacity = 255;
+        this.node.color = cc.Color.WHITE;
         this.groundColliders = [];
         this.vineColliders = [];
         this.climbPassThroughColliders = [];
@@ -608,9 +615,13 @@ export default class PlayerController extends cc.Component {
     }
 
     onBeginContact(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
+        if (this.isHazardTerrainCollider(otherCollider)) {
+            return;
+        }
+
         if (this.isEnemyCollider(otherCollider)) {
             if (!this.shouldIgnoreEnemyContact(otherCollider)) {
-                this.takeEnemyDamage();
+                this.takeDamage();
             }
             return;
         }
@@ -628,6 +639,14 @@ export default class PlayerController extends cc.Component {
     }
 
     onPreSolve(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
+        if (this.isHazardTerrainCollider(otherCollider)) {
+            this.refreshHazardGroundContact(contact, selfCollider, otherCollider);
+            if (!this.isStandingOnSafeGround(selfCollider)) {
+                this.takeDamage();
+            }
+            return;
+        }
+
         if (this.isEnemyCollider(otherCollider)) {
             if (this.isDamageInvincible) {
                 contact.disabledOnce = true;
@@ -638,7 +657,7 @@ export default class PlayerController extends cc.Component {
                 return;
             }
 
-            this.takeEnemyDamage();
+            this.takeDamage();
             contact.disabledOnce = true;
             return;
         }
@@ -656,6 +675,11 @@ export default class PlayerController extends cc.Component {
     }
 
     onEndContact(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
+        if (this.isHazardTerrainCollider(otherCollider)) {
+            this.removeCollider(this.groundColliders, otherCollider);
+            return;
+        }
+
         if (this.isEnemyCollider(otherCollider)) {
             this.removeCollider(this.groundColliders, otherCollider);
             return;
@@ -793,6 +817,10 @@ export default class PlayerController extends cc.Component {
             && (otherCollider.tag === this.flowerEnemyColliderTag || otherCollider.tag === this.goombaEnemyColliderTag);
     }
 
+    private isHazardTerrainCollider(otherCollider: cc.Collider) {
+        return otherCollider && otherCollider.tag === this.hazardTerrainColliderTag;
+    }
+
     public isInvincible() {
         return this.isDamageInvincible;
     }
@@ -811,7 +839,7 @@ export default class PlayerController extends cc.Component {
             && this.isStompingEnemy(otherCollider);
     }
 
-    private takeEnemyDamage() {
+    private takeDamage() {
         if (this.isDamageInvincible) {
             return;
         }
@@ -824,7 +852,8 @@ export default class PlayerController extends cc.Component {
         this.isDamageInvincible = true;
         this.invincibleTimer = this.damageInvincibleDuration;
         this.blinkTimer = 0;
-        this.node.opacity = 90;
+        this.node.opacity = 255;
+        this.node.color = this.damageTint;
     }
 
     private stopDamageInvincibility(opacity: number = 255) {
@@ -832,6 +861,7 @@ export default class PlayerController extends cc.Component {
         this.invincibleTimer = 0;
         this.blinkTimer = 0;
         this.node.opacity = opacity;
+        this.node.color = cc.Color.WHITE;
     }
 
     private updateDamageInvincibility(dt: number) {
@@ -848,7 +878,9 @@ export default class PlayerController extends cc.Component {
         this.blinkTimer += dt;
         if (this.blinkTimer >= this.invincibleBlinkInterval) {
             this.blinkTimer = 0;
-            this.node.opacity = this.node.opacity >= 200 ? 90 : 255;
+            const showDamageTint = this.node.opacity >= 200;
+            this.node.opacity = showDamageTint ? this.damageBlinkOpacity : 255;
+            this.node.color = showDamageTint ? cc.Color.WHITE : this.damageTint;
         }
     }
 
@@ -917,11 +949,49 @@ export default class PlayerController extends cc.Component {
         return overlapsX && bottomNearTop;
     }
 
+    private isStandingOnSafeGround(selfCollider: cc.Collider) {
+        if (!selfCollider) {
+            return false;
+        }
+
+        for (let i = 0; i < this.groundColliders.length; i++) {
+            const collider = this.groundColliders[i];
+            if (!collider || !collider.node || !cc.isValid(collider.node)) {
+                continue;
+            }
+
+            if (
+                this.isHazardTerrainCollider(collider)
+                || this.isEnemyCollider(collider)
+                || this.isVineCollider(collider)
+                || this.isCoinCollider(collider)
+            ) {
+                continue;
+            }
+
+            if (this.isStandingOn(collider)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private refreshGroundContact(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
         if (this.isVineCollider(otherCollider)) {
             return;
         }
 
+        if (this.isHazardTerrainCollider(otherCollider)) {
+            return;
+        }
+
+        if (this.isStandingOn(otherCollider) || this.hasGroundContactNormal(contact, selfCollider, otherCollider)) {
+            this.addUniqueCollider(this.groundColliders, otherCollider);
+        }
+    }
+
+    private refreshHazardGroundContact(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
         if (this.isStandingOn(otherCollider) || this.hasGroundContactNormal(contact, selfCollider, otherCollider)) {
             this.addUniqueCollider(this.groundColliders, otherCollider);
         }
