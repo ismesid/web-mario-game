@@ -832,6 +832,12 @@
     "gameSceneName": "MainGameScene",
     "buttonSfxPath": "audio/reserve",
     "buttonSfxVolume": 100,
+    "mainGameTransitionDuration": 2,
+    "transitionMarioAtlasPath": "player/mario_grouped_small",
+    "transitionWorldText": "WORLD1",
+    "transitionYellowFontPath": "fonts/yellow_font",
+    "transitionWorldFontSize": 192,
+    "transitionWorldYOffset": -60,
     "_id": "9etIFRxARJ8KBBQ0VKreGT"
   },
   {
