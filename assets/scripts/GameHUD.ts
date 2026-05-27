@@ -18,6 +18,9 @@ export default class GameHUD extends cc.Component {
     scorePerCoin: number = 100;
 
     @property
+    scorePerEnemy: number = 200;
+
+    @property
     topMargin: number = 14;
 
     @property
@@ -81,11 +84,15 @@ export default class GameHUD extends cc.Component {
         this.hudRoot.zIndex = 10000;
         this.loadFontsAndBuild();
         cc.systemEvent.on('coin-collected', this.onCoinCollected, this);
+        cc.systemEvent.on('enemy-defeated', this.onEnemyDefeated, this);
+        cc.systemEvent.on('player-damaged', this.onPlayerDamaged, this);
         cc.systemEvent.on('level-ready', this.onLevelReady, this);
     }
 
     onDestroy() {
         cc.systemEvent.off('coin-collected', this.onCoinCollected, this);
+        cc.systemEvent.off('enemy-defeated', this.onEnemyDefeated, this);
+        cc.systemEvent.off('player-damaged', this.onPlayerDamaged, this);
         cc.systemEvent.off('level-ready', this.onLevelReady, this);
     }
 
@@ -228,6 +235,16 @@ export default class GameHUD extends cc.Component {
     private onCoinCollected() {
         this.coinCount++;
         this.score += this.scorePerCoin;
+        this.refreshText();
+    }
+
+    private onEnemyDefeated(scoreValue: number) {
+        this.score += typeof scoreValue === 'number' ? scoreValue : this.scorePerEnemy;
+        this.refreshText();
+    }
+
+    private onPlayerDamaged() {
+        this.lives = Math.max(0, this.lives - 1);
         this.refreshText();
     }
 

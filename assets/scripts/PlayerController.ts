@@ -36,6 +36,18 @@ export default class PlayerController extends cc.Component {
     coinColliderTag: number = 2002;
 
     @property
+    flowerEnemyColliderTag: number = 3001;
+
+    @property
+    goombaEnemyColliderTag: number = 3002;
+
+    @property
+    damageInvincibleDuration: number = 2;
+
+    @property
+    invincibleBlinkInterval: number = 0.1;
+
+    @property
     autoSetColliderSize: boolean = true;
 
     @property
@@ -85,6 +97,9 @@ export default class PlayerController extends cc.Component {
     private currentAnimationKey = '';
     private isLevelReady = true;
     private isClimbing = false;
+    private isDamageInvincible = false;
+    private invincibleTimer = 0;
+    private blinkTimer = 0;
     private spawnPosition: cc.Vec2 = null;
     private defaultGravityScale = 1;
     private readonly groundCheckTolerance = 8;
@@ -146,12 +161,15 @@ export default class PlayerController extends cc.Component {
     }
 
     update() {
+        const dt = cc.director.getDeltaTime();
+        this.updateDamageInvincibility(dt);
+
         if (!this.body || !this.isLevelReady) {
             return;
         }
 
         if (this.jumpAnimationTimer > 0) {
-            this.jumpAnimationTimer = Math.max(0, this.jumpAnimationTimer - cc.director.getDeltaTime());
+            this.jumpAnimationTimer = Math.max(0, this.jumpAnimationTimer - dt);
         }
 
         if (this.shouldForwardJumpFromUpInput() || this.shouldJumpFromVineTop()) {
@@ -326,6 +344,7 @@ export default class PlayerController extends cc.Component {
     private lockPlayer() {
         this.isLevelReady = false;
         this.node.setPosition(this.spawnPosition);
+        this.stopDamageInvincibility(0);
         this.node.opacity = 0;
         this.groundColliders = [];
         this.vineColliders = [];
@@ -343,6 +362,7 @@ export default class PlayerController extends cc.Component {
     private onLevelReady() {
         this.isLevelReady = true;
         this.node.setPosition(this.spawnPosition);
+        this.stopDamageInvincibility(255);
         this.node.opacity = 255;
         this.groundColliders = [];
         this.vineColliders = [];
@@ -588,6 +608,13 @@ export default class PlayerController extends cc.Component {
     }
 
     onBeginContact(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
+        if (this.isEnemyCollider(otherCollider)) {
+            if (!this.shouldIgnoreEnemyContact(otherCollider)) {
+                this.takeEnemyDamage();
+            }
+            return;
+        }
+
         if (this.isVineCollider(otherCollider)) {
             this.addUniqueCollider(this.vineColliders, otherCollider);
             return;
@@ -601,6 +628,21 @@ export default class PlayerController extends cc.Component {
     }
 
     onPreSolve(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
+        if (this.isEnemyCollider(otherCollider)) {
+            if (this.isDamageInvincible) {
+                contact.disabledOnce = true;
+                return;
+            }
+
+            if (this.shouldIgnoreEnemyContact(otherCollider)) {
+                return;
+            }
+
+            this.takeEnemyDamage();
+            contact.disabledOnce = true;
+            return;
+        }
+
         if (this.isCoinCollider(otherCollider)) {
             return;
         }
@@ -614,6 +656,11 @@ export default class PlayerController extends cc.Component {
     }
 
     onEndContact(contact: cc.PhysicsContact, selfCollider: cc.Collider, otherCollider: cc.Collider) {
+        if (this.isEnemyCollider(otherCollider)) {
+            this.removeCollider(this.groundColliders, otherCollider);
+            return;
+        }
+
         if (this.isVineCollider(otherCollider)) {
             this.removeCollider(this.vineColliders, otherCollider);
             if (!this.canClimb()) {
@@ -739,6 +786,103 @@ export default class PlayerController extends cc.Component {
 
     private isCoinCollider(otherCollider: cc.Collider) {
         return otherCollider && otherCollider.tag === this.coinColliderTag;
+    }
+
+    private isEnemyCollider(otherCollider: cc.Collider) {
+        return otherCollider
+            && (otherCollider.tag === this.flowerEnemyColliderTag || otherCollider.tag === this.goombaEnemyColliderTag);
+    }
+
+    public isInvincible() {
+        return this.isDamageInvincible;
+    }
+
+    private shouldIgnoreEnemyContact(otherCollider: cc.Collider) {
+        if (this.isDamageInvincible) {
+            return true;
+        }
+
+        if (this.isHarmlessGoomba(otherCollider)) {
+            return true;
+        }
+
+        return otherCollider
+            && otherCollider.tag === this.goombaEnemyColliderTag
+            && this.isStompingEnemy(otherCollider);
+    }
+
+    private takeEnemyDamage() {
+        if (this.isDamageInvincible) {
+            return;
+        }
+
+        cc.systemEvent.emit('player-damaged');
+        this.startDamageInvincibility();
+    }
+
+    private startDamageInvincibility() {
+        this.isDamageInvincible = true;
+        this.invincibleTimer = this.damageInvincibleDuration;
+        this.blinkTimer = 0;
+        this.node.opacity = 90;
+    }
+
+    private stopDamageInvincibility(opacity: number = 255) {
+        this.isDamageInvincible = false;
+        this.invincibleTimer = 0;
+        this.blinkTimer = 0;
+        this.node.opacity = opacity;
+    }
+
+    private updateDamageInvincibility(dt: number) {
+        if (!this.isDamageInvincible) {
+            return;
+        }
+
+        this.invincibleTimer -= dt;
+        if (this.invincibleTimer <= 0) {
+            this.stopDamageInvincibility();
+            return;
+        }
+
+        this.blinkTimer += dt;
+        if (this.blinkTimer >= this.invincibleBlinkInterval) {
+            this.blinkTimer = 0;
+            this.node.opacity = this.node.opacity >= 200 ? 90 : 255;
+        }
+    }
+
+    private isStompingEnemy(enemyCollider: cc.Collider) {
+        if (!enemyCollider) {
+            return false;
+        }
+
+        if (this.body && this.body.linearVelocity.y > 100) {
+            return false;
+        }
+
+        const selfCollider = this.getComponent(cc.PhysicsBoxCollider);
+        if (!selfCollider) {
+            return false;
+        }
+
+        const selfRect = this.getWorldRect(selfCollider);
+        const enemyRect = this.getWorldRect(enemyCollider);
+        const overlapsX = selfRect.left < enemyRect.right - 2 && selfRect.right > enemyRect.left + 2;
+        const selfAboveEnemy = selfRect.centerY > enemyRect.centerY;
+        const bottomNearTop = selfRect.bottom >= enemyRect.top - this.groundCheckTolerance
+            && selfRect.bottom <= enemyRect.top + this.groundCheckTolerance + 4;
+
+        return overlapsX && selfAboveEnemy && bottomNearTop;
+    }
+
+    private isHarmlessGoomba(enemyCollider: cc.Collider) {
+        if (!enemyCollider || enemyCollider.tag !== this.goombaEnemyColliderTag || !enemyCollider.node) {
+            return false;
+        }
+
+        const goomba = enemyCollider.node.getComponent('GoombaEnemy') as any;
+        return !!(goomba && typeof goomba.isHarmless === 'function' && goomba.isHarmless());
     }
 
     private addUniqueCollider(colliders: cc.Collider[], collider: cc.Collider) {

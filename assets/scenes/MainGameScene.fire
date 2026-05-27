@@ -78,10 +78,10 @@
     "_active": true,
     "_components": [
       {
-        "__id__": 52
+        "__id__": 53
       },
       {
-        "__id__": 53
+        "__id__": 54
       }
     ],
     "_prefab": null,
@@ -274,6 +274,7 @@
     "startTime": 284,
     "score": 0,
     "scorePerCoin": 100,
+    "scorePerEnemy": 200,
     "topMargin": 22,
     "leftMargin": 16,
     "rowScale": 2,
@@ -613,6 +614,10 @@
     "marioAtlasPath": "player/mario_grouped_small",
     "vineColliderTag": 1001,
     "coinColliderTag": 2002,
+    "flowerEnemyColliderTag": 3001,
+    "goombaEnemyColliderTag": 3002,
+    "damageInvincibleDuration": 2,
+    "invincibleBlinkInterval": 0.1,
     "autoSetColliderSize": true,
     "autoStartDelay": 0.2,
     "forceDynamicBody": true,
@@ -757,6 +762,9 @@
       },
       {
         "__id__": 51
+      },
+      {
+        "__id__": 52
       }
     ],
     "_prefab": null,
@@ -1503,7 +1511,7 @@
       "__id__": 16
     },
     "_children": [],
-    "_active": false,
+    "_active": true,
     "_components": [
       {
         "__id__": 36
@@ -1647,7 +1655,7 @@
       "__id__": 16
     },
     "_children": [],
-    "_active": true,
+    "_active": false,
     "_components": [
       {
         "__id__": 40
@@ -2037,6 +2045,46 @@
     "hiddenOffsetY": 2,
     "zIndex": -1,
     "_id": "afP77tCBJBlr5MUat2U4pu"
+  },
+  {
+    "__type__": "bb64c2uu09NpYBn5TvN5RNP",
+    "_name": "",
+    "_objFlags": 0,
+    "node": {
+      "__id__": 16
+    },
+    "_enabled": true,
+    "objectGroupName": "enimes1",
+    "goombaAtlasPath": "enemies/Goomba",
+    "playerNodePath": "Canvas/World/Player/mario_grouped_small.plist",
+    "walkFrameName": "Goomba_0.png",
+    "squashedFrameName": "Goomba_1.png",
+    "angelFrameNames": "Goomba_2.png,Goomba_3.png",
+    "ignoredLayerNames": "background,no collide",
+    "vineLayerNames": "vines",
+    "goombaWidth": 20,
+    "goombaHeight": 24,
+    "colliderWidth": 16,
+    "colliderHeight": 18,
+    "colliderOffsetY": 9,
+    "enemyColliderTag": 3002,
+    "coinColliderTag": 2002,
+    "activationDelay": 0.5,
+    "lostPlayerReturnDelay": 2,
+    "samePlaneToleranceY": 8,
+    "chaseSpeed": 55,
+    "returnSpeed": 45,
+    "walkFps": 6,
+    "stompBounceSpeed": 260,
+    "squashDuration": 0.18,
+    "flyDuration": 0.8,
+    "flyRise": 48,
+    "scoreValue": 200,
+    "platformEdgePadding": 4,
+    "surfaceProbeOffsetY": 1,
+    "surfaceSearchRows": 2,
+    "zIndex": 490,
+    "_id": "158EoCDdBO7pT22+Sjoe2q"
   },
   {
     "__type__": "cc.Canvas",
