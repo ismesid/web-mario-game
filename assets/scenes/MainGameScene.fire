@@ -631,7 +631,7 @@
     "colliderHeight": 18,
     "jumpSfxPath": "audio/jump",
     "climbSfxPath": "audio/climb",
-    "sfxVolume": 100,
+    "sfxVolume": 1,
     "climbSfxInterval": 0.25,
     "_id": "f1Lc7pO6hOLLornQxSeEU+"
   },
@@ -2004,7 +2004,7 @@
     "collectEffectDuration": 0.35,
     "collectEffectRise": 12,
     "coinSfxPath": "audio/coin",
-    "sfxVolume": 100,
+    "sfxVolume": 1,
     "coinSfxBoost": 1.5,
     "coinSfxEngineVolume": 0.2,
     "_id": "acqB3isD9BTbH94b86nNFr"
@@ -2058,8 +2058,8 @@
     "cooldownDuration": 1,
     "enemyColliderTag": 3001,
     "colliderWidth": 12,
-    "colliderHeight": 18,
-    "colliderOffsetY": 11,
+    "colliderHeight": 24,
+    "colliderOffsetY": 14,
     "hiddenOffsetY": 2,
     "zIndex": -1,
     "_id": "afP77tCBJBlr5MUat2U4pu"
@@ -2103,7 +2103,7 @@
     "surfaceSearchRows": 2,
     "zIndex": 490,
     "stompSfxPath": "audio/stomp",
-    "sfxVolume": 100,
+    "sfxVolume": 1,
     "_id": "158EoCDdBO7pT22+Sjoe2q"
   },
   {
