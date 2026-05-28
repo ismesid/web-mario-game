@@ -23,6 +23,24 @@ export default class CameraFollow extends cc.Component {
     useCameraVisibleSize: boolean = true;
 
     @property
+    showSideLetterbox: boolean = true;
+
+    @property
+    letterboxDesignWidth: number = 960;
+
+    @property
+    letterboxColor: cc.Color = cc.color(0, 0, 0, 255);
+
+    @property
+    letterboxZIndex: number = 100000;
+
+    @property
+    leftBoundsInset: number = 0;
+
+    @property
+    rightBoundsInset: number = 0;
+
+    @property
     followX: boolean = true;
 
     @property
@@ -45,6 +63,8 @@ export default class CameraFollow extends cc.Component {
     private initialPosition: cc.Vec2 = null;
     private camera: cc.Camera = null;
     private yHomePosition = 0;
+    private leftLetterbox: cc.Node = null;
+    private rightLetterbox: cc.Node = null;
 
     onLoad() {
         this.targetNode = cc.find(this.targetNodePath);
@@ -53,6 +73,7 @@ export default class CameraFollow extends cc.Component {
         this.yHomePosition = this.initialPosition.y;
         this.camera = this.getComponent(cc.Camera);
         this.applyCameraZoom();
+        this.applyCameraViewport();
     }
 
     start() {
@@ -61,10 +82,13 @@ export default class CameraFollow extends cc.Component {
             this.node.setPosition(nextPosition);
             this.yHomePosition = nextPosition.y;
         }
+        this.updateSideLetterbox();
     }
 
     lateUpdate(dt: number) {
         this.applyCameraZoom();
+        this.applyCameraViewport();
+        this.updateSideLetterbox();
 
         if (GamePause.paused) {
             return;
@@ -101,8 +125,10 @@ export default class CameraFollow extends cc.Component {
             const bounds = this.getMapBoundsInCameraParent();
             if (bounds) {
                 const viewSize = this.getVisibleWorldSize();
-                const minX = bounds.left + viewSize.width * 0.5;
-                const maxX = bounds.right - viewSize.width * 0.5;
+                const left = bounds.left + Math.max(0, this.leftBoundsInset);
+                const right = bounds.right - Math.max(0, this.rightBoundsInset);
+                const minX = left + viewSize.width * 0.5;
+                const maxX = right - viewSize.width * 0.5;
                 const minY = bounds.bottom + viewSize.height * 0.5;
                 const maxY = bounds.top - viewSize.height * 0.5;
 
@@ -138,19 +164,119 @@ export default class CameraFollow extends cc.Component {
         }
     }
 
+    private applyCameraViewport() {
+        if (!this.camera) {
+            this.camera = this.getComponent(cc.Camera);
+        }
+        if (!this.camera) {
+            return;
+        }
+
+        const frameSize = cc.view.getFrameSize();
+        const shouldLetterbox = this.showSideLetterbox
+            && this.letterboxDesignWidth > 0
+            && frameSize.width > this.letterboxDesignWidth;
+        const width = shouldLetterbox ? this.letterboxDesignWidth / frameSize.width : 1;
+        const x = shouldLetterbox ? (1 - width) * 0.5 : 0;
+
+        if (
+            Math.abs(this.camera.rect.x - x) > 0.0001
+            || Math.abs(this.camera.rect.width - width) > 0.0001
+            || this.camera.rect.y !== 0
+            || this.camera.rect.height !== 1
+        ) {
+            this.camera.rect = cc.rect(x, 0, width, 1);
+        }
+    }
+
+    private updateSideLetterbox() {
+        if (!this.showSideLetterbox || !this.camera || this.letterboxDesignWidth <= 0) {
+            this.setLetterboxActive(false);
+            return;
+        }
+
+        const visibleSize = this.getEffectiveVisibleSize();
+        const zoom = this.camera.zoomRatio > 0 ? this.camera.zoomRatio : 1;
+        const extraScreenWidth = Math.max(0, visibleSize.width - this.letterboxDesignWidth);
+        const barWorldWidth = extraScreenWidth * 0.5 / zoom;
+
+        if (barWorldWidth <= 0.5) {
+            this.setLetterboxActive(false);
+            return;
+        }
+
+        const visibleWorldWidth = visibleSize.width / zoom;
+        const visibleWorldHeight = visibleSize.height / zoom;
+        const paddedWidth = barWorldWidth + 2 / zoom;
+        const paddedHeight = visibleWorldHeight + 4 / zoom;
+
+        this.leftLetterbox = this.drawLetterbox(
+            this.leftLetterbox,
+            'LeftLetterbox',
+            -visibleWorldWidth * 0.5 + barWorldWidth * 0.5,
+            0,
+            paddedWidth,
+            paddedHeight
+        );
+        this.rightLetterbox = this.drawLetterbox(
+            this.rightLetterbox,
+            'RightLetterbox',
+            visibleWorldWidth * 0.5 - barWorldWidth * 0.5,
+            0,
+            paddedWidth,
+            paddedHeight
+        );
+    }
+
+    private drawLetterbox(node: cc.Node, name: string, x: number, y: number, width: number, height: number) {
+        if (!node || !cc.isValid(node)) {
+            node = new cc.Node(name);
+            node.parent = this.node;
+            node.zIndex = this.letterboxZIndex;
+            node.addComponent(cc.Graphics);
+        }
+
+        node.active = true;
+        node.zIndex = this.letterboxZIndex;
+        node.setPosition(x, y);
+
+        const graphics = node.getComponent(cc.Graphics);
+        graphics.clear();
+        graphics.fillColor = this.letterboxColor || cc.color(0, 0, 0, 255);
+        graphics.rect(-width * 0.5, -height * 0.5, width, height);
+        graphics.fill();
+
+        return node;
+    }
+
+    private setLetterboxActive(active: boolean) {
+        if (this.leftLetterbox && cc.isValid(this.leftLetterbox)) {
+            this.leftLetterbox.active = active;
+        }
+        if (this.rightLetterbox && cc.isValid(this.rightLetterbox)) {
+            this.rightLetterbox.active = active;
+        }
+    }
+
     private getVisibleWorldSize() {
         if (!this.useCameraVisibleSize || !this.camera || this.camera.zoomRatio <= 0) {
             return cc.size(this.viewWidth, this.viewHeight);
         }
 
-        const visibleSize = cc.size(
-            this.node.width || cc.view.getVisibleSize().width,
-            this.node.height || cc.view.getVisibleSize().height
-        );
+        const visibleSize = this.getEffectiveVisibleSize();
         return cc.size(
             visibleSize.width / this.camera.zoomRatio,
             visibleSize.height / this.camera.zoomRatio
         );
+    }
+
+    private getEffectiveVisibleSize() {
+        const visibleSize = cc.view.getVisibleSize();
+        if (this.showSideLetterbox && this.letterboxDesignWidth > 0) {
+            return cc.size(Math.min(visibleSize.width, this.letterboxDesignWidth), visibleSize.height);
+        }
+
+        return visibleSize;
     }
 
     private getMapBoundsInCameraParent() {

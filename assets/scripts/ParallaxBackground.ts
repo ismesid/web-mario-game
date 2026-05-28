@@ -127,7 +127,7 @@ export default class ParallaxBackground extends cc.Component {
         const bounds = this.getMapBoundsInCameraParent();
         const cameraPosition = cc.v2(this.node.x, this.node.y);
 
-        if (!bounds) {
+        if (!bounds || !this.repeatHorizontally) {
             this.backgroundNode.setPosition(cameraPosition.x, cameraPosition.y + this.verticalOffset);
             return;
         }
@@ -135,7 +135,7 @@ export default class ParallaxBackground extends cc.Component {
         const minCameraX = bounds.left + visibleSize.width * 0.5;
         const bgSize = this.backgroundNode.getContentSize();
         const cameraTravelX = Math.max(0, cameraPosition.x - minCameraX);
-        const startLeft = bounds.left - visibleSize.width - this.tileWidth;
+        const startLeft = bounds.left;
         const x = startLeft + bgSize.width * 0.5 + cameraTravelX * this.clamp01(this.scrollFactorX);
         const y = this.followCameraY
             ? cameraPosition.y

@@ -6,7 +6,7 @@ const { ccclass, property } = cc._decorator;
 @ccclass
 export default class SceneChanger extends cc.Component {
     @property
-    bgmVolume: number = 100;
+    bgmVolume: number = 50;
 
     @property
     sceneBgmPath: string = '';
@@ -93,7 +93,7 @@ export default class SceneChanger extends cc.Component {
     private static targetBgmPath = '';
     private static loadingBgmPath = '';
     private static currentBgmClip: cc.AudioClip = null;
-    private static bgmVolume = 100;
+    private static bgmVolume = 50;
     private static maxBgmEngineVolume = 0.06;
     private static defaultBgmPath = 'audio/bgm_1';
     private static gameBgmPath = 'audio/bgm_3';

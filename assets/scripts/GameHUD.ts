@@ -50,6 +50,12 @@ export default class GameHUD extends cc.Component {
     scoreRightPadding: number = 16;
 
     @property
+    useLetterboxedViewport: boolean = true;
+
+    @property
+    letterboxDesignWidth: number = 960;
+
+    @property
     worldSpritePath: string = 'pictures/world';
 
     @property
@@ -757,9 +763,10 @@ export default class GameHUD extends cc.Component {
 
         const zoom = camera ? camera.zoomRatio : 1;
         const size = cc.winSize;
+        const viewportWidth = this.getHudViewportWidth();
         this.hudRoot.scale = this.rowScale / zoom;
         this.hudRoot.setPosition(
-            this.node.x - size.width * 0.5 / zoom + this.leftMargin / zoom,
+            this.node.x - viewportWidth * 0.5 / zoom + this.leftMargin / zoom,
             this.node.y + size.height * 0.5 / zoom - this.topMargin / zoom
         );
         this.hudRoot.zIndex = 10000;
@@ -771,9 +778,19 @@ export default class GameHUD extends cc.Component {
             return;
         }
 
-        const size = cc.winSize;
-        this.scoreLabel.node.x = (size.width - this.leftMargin - this.scoreRightPadding) / this.rowScale;
+        const viewportWidth = this.getHudViewportWidth();
+        this.scoreLabel.node.x = (viewportWidth - this.leftMargin - this.scoreRightPadding) / this.rowScale;
         this.scoreLabel.node.y = this.getLabelY();
+    }
+
+    private getHudViewportWidth() {
+        const size = cc.winSize;
+        if (this.useLetterboxedViewport && this.letterboxDesignWidth > 0) {
+            return Math.min(size.width, this.letterboxDesignWidth);
+        }
+
+        const camera = this.getComponent(cc.Camera);
+        return camera ? size.width * camera.rect.width : size.width;
     }
 
     private layoutX(screenX: number) {

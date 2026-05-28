@@ -728,7 +728,7 @@
       "__id__": 7
     },
     "_enabled": true,
-    "bgmVolume": 100,
+    "bgmVolume": 50,
     "sceneBgmPath": "audio/bgm_1",
     "defaultBgmPath": "audio/bgm_1",
     "gameBgmPath": "audio/bgm_3",

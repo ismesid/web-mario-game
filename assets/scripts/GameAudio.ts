@@ -6,7 +6,7 @@ export default class GameAudio extends cc.Component {
     private static pendingCallbacks: { [path: string]: Function[] } = {};
 
     private static maxSfxEngineVolume = 0.1;
-    private static masterSfxVolume = 100;
+    private static masterSfxVolume = 50;
 
     public static preloadSfx(path: string) {
         if (!path || GameAudio.clipCache[path] || GameAudio.pendingCallbacks[path]) {
