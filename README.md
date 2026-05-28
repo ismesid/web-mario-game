@@ -6,8 +6,8 @@ The game includes a complete playable flow from start menu, login/register, leve
 
 ## Website and Project Information
 
-- Firebase Hosting: `https://web-mario-game.web.app`
-- GitHub repository: `https://github.com/ismesid/web-mario-game.git`
+- Firebase Hosting: [https://web-mario-game.web.app](https://web-mario-game.web.app)
+- GitHub repository: [https://github.com/ismesid/web-mario-game](https://github.com/ismesid/web-mario-game)
 - Cocos Creator version: `2.4.8`
 - Main build target: Web Desktop
 - Build output: `build/web-desktop`
