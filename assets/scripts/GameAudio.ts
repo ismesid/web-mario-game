@@ -6,6 +6,7 @@ export default class GameAudio extends cc.Component {
     private static pendingCallbacks: { [path: string]: Function[] } = {};
 
     private static maxSfxEngineVolume = 0.1;
+    private static masterSfxVolume = 100;
 
     public static preloadSfx(path: string) {
         if (!path || GameAudio.clipCache[path] || GameAudio.pendingCallbacks[path]) {
@@ -86,6 +87,15 @@ export default class GameAudio extends cc.Component {
         GameAudio.loadSfx(path);
     }
 
+    public static setMasterSfxVolume(volume: number) {
+        const safeVolume = typeof volume === 'number' && !isNaN(volume) ? volume : GameAudio.masterSfxVolume;
+        GameAudio.masterSfxVolume = Math.max(0, Math.min(100, safeVolume));
+    }
+
+    public static getMasterSfxVolume() {
+        return GameAudio.masterSfxVolume;
+    }
+
     private static loadSfx(path: string) {
         cc.loader.loadRes(path, cc.AudioClip, (err: Error, clip: cc.AudioClip) => {
             const callbacks = GameAudio.pendingCallbacks[path] || [];
@@ -113,10 +123,11 @@ export default class GameAudio extends cc.Component {
     }
 
     private static toEngineVolume(volume: number) {
+        const masterScale = GameAudio.masterSfxVolume / 100;
         if (volume <= 1) {
-            return Math.max(0, Math.min(GameAudio.maxSfxEngineVolume, volume));
+            return Math.max(0, Math.min(GameAudio.maxSfxEngineVolume, volume)) * masterScale;
         }
 
-        return Math.max(0, Math.min(1, GameAudio.maxSfxEngineVolume * volume / 100));
+        return Math.max(0, Math.min(1, GameAudio.maxSfxEngineVolume * volume / 100 * masterScale));
     }
 }

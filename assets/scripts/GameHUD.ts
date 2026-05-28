@@ -1,4 +1,5 @@
 import GameAudio from './GameAudio';
+import FirebaseService from './FirebaseService';
 import GamePause from './GamePause';
 import SceneChanger from './SceneChanger';
 
@@ -126,6 +127,9 @@ export default class GameHUD extends cc.Component {
     @property
     victoryFontSize: number = 128;
 
+    @property
+    saveFirebaseRunRecords: boolean = true;
+
     private timeLeft = 0;
     private coinCount = 0;
     private timerRunning = true;
@@ -143,6 +147,7 @@ export default class GameHUD extends cc.Component {
     private continueOverlay: cc.Node = null;
     private gameOverOverlay: cc.Node = null;
     private victoryOverlay: cc.Node = null;
+    private runRecordSaved = false;
 
     onLoad() {
         this.timeLeft = this.startTime;
@@ -159,6 +164,9 @@ export default class GameHUD extends cc.Component {
         GameAudio.preloadSfx(this.continueButtonSfxPath);
         GameAudio.preloadSfx(this.gameOverSfxPath);
         GameAudio.preloadSfx(this.levelClearSfxPath);
+        FirebaseService.initialize().catch(() => {
+            cc.warn('[GameHUD] Firebase is not ready. Run records will be skipped until it loads.');
+        });
     }
 
     onDestroy() {
@@ -417,6 +425,7 @@ export default class GameHUD extends cc.Component {
         GamePause.pause();
         SceneChanger.pauseBgm();
         this.removeContinueOverlay();
+        this.saveFirebaseRunRecord(false);
         GameAudio.getSfxDuration(this.gameOverSfxPath, this.gameOverDuration, (duration: number) => {
             if (!this.gameOverStarted || !cc.isValid(this.node)) {
                 return;
@@ -452,6 +461,7 @@ export default class GameHUD extends cc.Component {
         GamePause.pause();
         SceneChanger.pauseBgm();
         this.removeContinueOverlay();
+        this.saveFirebaseRunRecord(true);
         GameAudio.getSfxDuration(this.levelClearSfxPath, this.levelClearDuration, (duration: number) => {
             if (!this.victoryStarted || !cc.isValid(this.node)) {
                 return;
@@ -466,6 +476,28 @@ export default class GameHUD extends cc.Component {
                 GamePause.resume();
                 cc.director.loadScene('LevelSelectScene');
             }, safeDuration);
+        });
+    }
+
+    private saveFirebaseRunRecord(cleared: boolean) {
+        if (!this.saveFirebaseRunRecords || this.runRecordSaved) {
+            return;
+        }
+
+        this.runRecordSaved = true;
+        FirebaseService.saveRun({
+            score: this.score,
+            coins: this.coinCount,
+            playTimeSec: Math.max(0, this.startTime - this.timeLeft),
+            timeLeft: Math.max(0, this.timeLeft),
+            world: this.worldText,
+            cleared: cleared
+        }).then((saved: boolean) => {
+            if (!saved) {
+                cc.log('[GameHUD] No Firebase user signed in. Skipped run record.');
+            }
+        }).catch((err: Error) => {
+            cc.warn('[GameHUD] Failed to save run record.', err);
         });
     }
 

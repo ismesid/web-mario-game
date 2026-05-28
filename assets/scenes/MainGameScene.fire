@@ -309,6 +309,7 @@
     "victoryMarioAtlasPath": "player/mario_grouped_small",
     "victoryText": "LEVEL CLEAR",
     "victoryFontSize": 128,
+    "saveFirebaseRunRecords": true,
     "_id": "82CvutVR9MUK7Z2mES7Dqk"
   },
   {
